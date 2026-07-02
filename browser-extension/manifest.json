@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "IMAU 日程导入器",
+  "version": "1.0.0",
+  "description": "从内蒙古农业大学在线教学平台导入考试、作业等日程数据",
+  "permissions": ["activeTab", "scripting", "storage", "clipboardWrite"],
+  "host_permissions": ["https://*.imau.edu.cn/*", "https://imau.edu.cn/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "IMAU 日程导入"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.imau.edu.cn/*", "https://imau.edu.cn/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}

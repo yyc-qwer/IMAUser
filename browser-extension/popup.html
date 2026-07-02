@@ -1,0 +1,61 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { width: 380px; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 14px; color: #1f2937; background: #fff; }
+    .header { background: #1e3a5f; color: #fff; padding: 14px 16px; display: flex; align-items: center; gap: 8px; }
+    .header h1 { font-size: 16px; font-weight: 600; }
+    .content { padding: 16px; }
+    .info { font-size: 12px; color: #6b7280; margin-bottom: 12px; line-height: 1.6; }
+    .status { margin-bottom: 12px; padding: 10px; border-radius: 6px; font-size: 13px; }
+    .status.success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+    .status.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .status.info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+    .btn { display: block; width: 100%; padding: 10px; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 8px; }
+    .btn-primary { background: #1e3a5f; color: #fff; }
+    .btn-primary:hover { background: #1e4a7f; }
+    .btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+    .btn-secondary:hover { background: #e5e7eb; }
+    .btn-accent { background: #059669; color: #fff; }
+    .btn-accent:hover { background: #047857; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .preview { margin-top: 8px; max-height: 160px; overflow-y: auto; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; font-size: 12px; white-space: pre-wrap; word-break: break-all; display: none; }
+    .config { margin-top: 16px; padding-top: 12px; border-top: 1px solid #e5e7eb; }
+    .config h3 { font-size: 13px; margin-bottom: 8px; color: #6b7280; }
+    .config label { font-size: 12px; color: #6b7280; display: block; margin-bottom: 4px; }
+    .config input { width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px; margin-bottom: 8px; }
+    .row-btns { display: flex; gap: 8px; }
+    .row-btns .btn { flex: 1; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>IMAU 日程导入器</h1>
+  </div>
+  <div class="content">
+    <p class="info">打开 imau.edu.cn 页面后点击提取按钮，自动抓取作业 &amp; 测试数据。</p>
+    <div id="status" class="status" style="display:none;"></div>
+    <button id="extractBtn" class="btn btn-primary">提取日程数据</button>
+    <div class="row-btns">
+      <button id="pushBtn" class="btn btn-accent" disabled>写入日程看板</button>
+      <button id="copyBtn" class="btn btn-secondary" disabled>复制 JSON</button>
+    </div>
+    <pre id="preview" class="preview"></pre>
+    <div class="config">
+      <h3>自定义选择器（可选）</h3>
+      <label>行选择器</label>
+      <input id="rowSelector" placeholder="li">
+      <label>标题选择器</label>
+      <input id="titleSelector" placeholder="h6">
+      <label>日期选择器</label>
+      <input id="dateSelector" placeholder="p span:first-child">
+      <label>类型关键字</label>
+      <input id="typeSelector" placeholder="作业/测试/考试">
+      <button id="customExtractBtn" class="btn btn-secondary">使用自定义选择器提取</button>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
