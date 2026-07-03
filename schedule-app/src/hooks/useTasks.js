@@ -1,6 +1,37 @@
 import { useState, useEffect, useCallback } from 'react';
-import db from '../store/db';
+import { supabase } from '../supabaseClient';
+import { useAuth } from './useAuth';
 import { sortByUrgency } from '../utils/dateUtils';
+
+// ===== Snake/Camel case helpers =====
+function toSnakeCase(obj) {
+  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+  const result = {};
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const snake = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+      result[snake] = toSnakeCase(obj[key]);
+    }
+  }
+  return result;
+}
+
+function toCamelCase(obj) {
+  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+  const result = {};
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const camel = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+      result[camel] = toCamelCase(obj[key]);
+    }
+  }
+  return result;
+}
+
+function mapToCamelCase(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.map(item => toCamelCase(item));
+}
 
 // ===== Notification helpers =====
 const NOTIF_KEY = 'schedule_notif_enabled';
@@ -29,7 +60,11 @@ export function scheduleTaskNotification(task) {
   if (delay <= 0) return;
 
   setTimeout(async () => {
-    const current = await db.tasks.get(task.id);
+    const { data: current } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('id', task.id)
+      .single();
     if (!current || current.completed || current.notified) return;
     if (Notification.permission === 'granted') {
       new Notification('日程提醒', {
@@ -38,27 +73,30 @@ export function scheduleTaskNotification(task) {
         tag: `task-${current.id}`,
       });
     }
-    await db.tasks.update(current.id, { notified: true });
+    await supabase.from('tasks').update({ notified: true }).eq('id', current.id);
   }, delay);
 }
 
 async function rescheduleAllNotifications() {
   if (!isNotificationEnabled() || Notification.permission !== 'granted') return;
-  const tasks = await db.tasks.toArray();
+  const { data } = await supabase.from('tasks').select('*');
+  const tasks = mapToCamelCase(data || []);
   tasks.forEach(t => scheduleTaskNotification(t));
 }
 
 // ===== Repeat task helper =====
 const REPEAT_CHECK_KEY = 'schedule_repeat_last_check';
 
-export async function processRepeatTasks() {
+export async function processRepeatTasks(currentUser) {
   const lastCheck = localStorage.getItem(REPEAT_CHECK_KEY);
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
 
   if (lastCheck === todayStr) return;
 
-  const tasks = await db.tasks.toArray();
+  const { data: taskData } = await supabase.from('tasks').select('*');
+  const tasks = mapToCamelCase(taskData || []);
+
   for (const task of tasks) {
     if (!task.repeatRule || task.repeatRule === 'none') continue;
     if (!task.completed) continue;
@@ -71,14 +109,16 @@ export async function processRepeatTasks() {
     if (task.repeatRule === 'weekly' && daysSince >= 7) shouldCreate = true;
 
     if (shouldCreate) {
-      const existing = await db.tasks
-        .where('title')
-        .equals(task.title)
-        .and(t => !t.completed && t.createdAt && t.createdAt.startsWith(todayStr))
-        .count();
+      const { count } = await supabase
+        .from('tasks')
+        .select('*', { count: 'exact', head: true })
+        .eq('title', task.title)
+        .eq('completed', false)
+        .ilike('created_at', `${todayStr}%`);
 
-      if (existing === 0) {
-        await db.tasks.add({
+      if (count === 0) {
+        await supabase.from('tasks').insert(toSnakeCase({
+          userId: currentUser?.id,
           title: task.title,
           typeId: task.typeId,
           startDate: null,
@@ -91,7 +131,7 @@ export async function processRepeatTasks() {
           reminderAt: task.reminderAt,
           repeatRule: task.repeatRule,
           createdAt: new Date().toISOString(),
-        });
+        }));
       }
     }
   }
@@ -101,8 +141,6 @@ export async function processRepeatTasks() {
 
 // ===== Advanced Stats Helpers =====
 
-// 拖延指数: 0-100, 越低越好
-// 基于: 有截止日期的已完成任务中，提前完成的比例和平均提前天数
 export function calcProcrastinationIndex(tasks) {
   const tasksWithDeadline = tasks.filter(t => t.completed && t.endDate);
   if (tasksWithDeadline.length === 0) return null;
@@ -121,8 +159,6 @@ export function calcProcrastinationIndex(tasks) {
   const onTimeRate = onTimeCount / tasksWithDeadline.length;
   const avgAdvance = totalAdvanceDays / tasksWithDeadline.length;
 
-  // 指数计算: 准时率占60%, 平均提前天数占40%
-  // avgAdvance 越大越好(提前多), 负数表示拖后
   let score = onTimeRate * 60;
   if (avgAdvance >= 3) score += 40;
   else if (avgAdvance >= 1) score += 30;
@@ -133,7 +169,6 @@ export function calcProcrastinationIndex(tasks) {
   return Math.round(score);
 }
 
-// 未来30天 deadline 压力分布
 export function getDeadlinePressure(tasks) {
   const now = new Date();
   const result = [];
@@ -154,11 +189,9 @@ export function getDeadlinePressure(tasks) {
   return result;
 }
 
-// 连续打卡天数 (GitHub风格)
 export function getStreakData(tasks) {
   const now = new Date();
   const days = [];
-  // 过去 180 天 (约6个月)
   for (let i = 179; i >= 0; i--) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
@@ -169,14 +202,12 @@ export function getStreakData(tasks) {
     days.push({ date: dateStr, count: completed });
   }
 
-  // 计算当前连续打卡天数
   let currentStreak = 0;
   for (let i = days.length - 1; i >= 0; i--) {
     if (days[i].count > 0) currentStreak++;
     else break;
   }
 
-  // 计算最长连续打卡
   let maxStreak = 0;
   let tempStreak = 0;
   days.forEach(d => {
@@ -188,92 +219,160 @@ export function getStreakData(tasks) {
 }
 
 export function useTasks() {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [taskTypes, setTaskTypes] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const t = await db.tasks.toArray();
-    setTasks(sortByUrgency(t));
-    const types = await db.taskTypes.toArray();
-    setTaskTypes(types);
+    const { data: taskData, error: taskError } = await supabase
+      .from('tasks')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (taskError) console.error('fetch tasks error:', taskError);
+
+    const { data: typeData, error: typeError } = await supabase
+      .from('task_types')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (typeError) console.error('fetch types error:', typeError);
+
+    setTasks(sortByUrgency(mapToCamelCase(taskData || [])));
+    setTaskTypes(mapToCamelCase(typeData || []));
     setLoading(false);
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
 
   useEffect(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') refresh();
+      if (event === 'SIGNED_OUT') {
+        setTasks([]);
+        setTaskTypes([]);
+        setLoading(false);
+      }
+    });
+    return () => listener?.subscription?.unsubscribe();
+  }, [refresh]);
+
+  useEffect(() => {
     rescheduleAllNotifications();
-    processRepeatTasks();
-  }, []);
+    processRepeatTasks(user);
+  }, [user]);
 
   const addTask = async (task) => {
-    const id = await db.tasks.add({
+    if (!user) return null;
+    const payload = toSnakeCase({
       ...task,
+      userId: user.id,
       completed: false,
       notified: false,
       createdAt: new Date().toISOString(),
     });
-    const inserted = await db.tasks.get(id);
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert(payload)
+      .select()
+      .single();
+    if (error) {
+      console.error('add task error:', error);
+      return null;
+    }
+    const inserted = toCamelCase(data);
     if (isNotificationEnabled()) scheduleTaskNotification(inserted);
     await refresh();
-    return id;
+    return inserted.id;
   };
 
   const updateTask = async (id, updates) => {
-    await db.tasks.update(id, updates);
-    const updated = await db.tasks.get(id);
+    const payload = toSnakeCase(updates);
+    const { data, error } = await supabase
+      .from('tasks')
+      .update(payload)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) {
+      console.error('update task error:', error);
+      return;
+    }
+    const updated = toCamelCase(data);
     if (isNotificationEnabled()) scheduleTaskNotification(updated);
     await refresh();
   };
 
   const deleteTask = async (id) => {
-    await db.tasks.delete(id);
-    await db.subtasks.where('taskId').equals(id).delete();
+    await supabase.from('subtasks').delete().eq('task_id', id);
+    await supabase.from('tasks').delete().eq('id', id);
     await refresh();
   };
 
   const toggleComplete = async (id) => {
-    const task = await db.tasks.get(id);
+    const { data: task } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (!task) return;
     const newCompleted = !task.completed;
-    await db.tasks.update(id, {
+    await supabase.from('tasks').update({
       completed: newCompleted,
-      completedAt: newCompleted ? new Date().toISOString() : null,
-    });
+      completed_at: newCompleted ? new Date().toISOString() : null,
+    }).eq('id', id);
     await refresh();
   };
 
   const addTaskType = async (type) => {
-    await db.taskTypes.add(type);
+    if (!user) return;
+    await supabase.from('task_types').insert(toSnakeCase({
+      ...type,
+      userId: user.id,
+      createdAt: new Date().toISOString(),
+    }));
     await refresh();
   };
 
   const deleteTaskType = async (id) => {
-    await db.taskTypes.delete(id);
+    await supabase.from('task_types').delete().eq('id', id);
     await refresh();
   };
 
   // ===== Subtask operations =====
   const getSubtasks = async (taskId) => {
-    return await db.subtasks.where('taskId').equals(taskId).sortBy('id');
+    const { data, error } = await supabase
+      .from('subtasks')
+      .select('*')
+      .eq('task_id', taskId)
+      .order('id', { ascending: true });
+    if (error) {
+      console.error('fetch subtasks error:', error);
+      return [];
+    }
+    return mapToCamelCase(data || []);
   };
 
   const addSubtask = async (taskId, title) => {
-    await db.subtasks.add({
-      taskId,
+    await supabase.from('subtasks').insert({
+      task_id: taskId,
       title,
       completed: false,
-      createdAt: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     });
   };
 
   const toggleSubtask = async (subtaskId) => {
-    const st = await db.subtasks.get(subtaskId);
-    await db.subtasks.update(subtaskId, { completed: !st.completed });
+    const { data } = await supabase
+      .from('subtasks')
+      .select('completed')
+      .eq('id', subtaskId)
+      .single();
+    if (!data) return;
+    await supabase.from('subtasks').update({ completed: !data.completed }).eq('id', subtaskId);
   };
 
   const deleteSubtask = async (subtaskId) => {
-    await db.subtasks.delete(subtaskId);
+    await supabase.from('subtasks').delete().eq('id', subtaskId);
   };
 
   // ===== Stats =====

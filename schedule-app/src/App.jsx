@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useTasks, isNotificationEnabled, setNotificationEnabled, requestNotificationPermission, calcProcrastinationIndex, getDeadlinePressure, getStreakData } from "./hooks/useTasks";
+import { useAuth } from "./hooks/useAuth";
 import { formatCountdown, fmtDate } from "./utils/dateUtils";
 
 const COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
@@ -146,6 +147,8 @@ function SubtaskList({ taskId, getSubtasks, addSubtask, toggleSubtask, deleteSub
 }
 
 function App() {
+  const { user, loading: authLoading, signUp, signIn, signOut } = useAuth();
+
   const {
     tasks, taskTypes, loading, activeTasks, completedTasks,
     addTask, updateTask, deleteTask, toggleComplete,
@@ -153,6 +156,13 @@ function App() {
     getSubtasks, addSubtask, toggleSubtask, deleteSubtask,
     getWeeklyStats,
   } = useTasks();
+
+  // Login form state
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authSubmitting, setAuthSubmitting] = useState(false);
 
   const [view, setView] = useState("tasks");
   const [showForm, setShowForm] = useState(false);
@@ -307,6 +317,63 @@ function App() {
   const maxWeeklyCompleted = Math.max(1, ...weeklyStats.map(s => s.completed));
   const maxWeeklyCreated = Math.max(1, ...weeklyStats.map(s => s.created));
 
+  if (authLoading) return <div className="loading">检查登录状态...</div>;
+
+  // ===== Login / Register View =====
+  if (!user) {
+    const handleAuthSubmit = async (e) => {
+      e.preventDefault();
+      setAuthError('');
+      setAuthSubmitting(true);
+      if (authMode === 'register') {
+        const { error } = await signUp(authEmail, authPassword);
+        if (error) setAuthError(error.message);
+        else setAuthError('注册成功！请查看邮箱验证（如未关闭验证则直接登录）');
+      } else {
+        const { error } = await signIn(authEmail, authPassword);
+        if (error) setAuthError('邮箱或密码错误');
+      }
+      setAuthSubmitting(false);
+    };
+
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <h1 className="auth-logo">日程看板</h1>
+          <p className="auth-subtitle">登录后管理你的日程任务</p>
+          <form className="auth-form" onSubmit={handleAuthSubmit}>
+            <input
+              type="email"
+              placeholder="邮箱地址"
+              value={authEmail}
+              onChange={e => setAuthEmail(e.target.value)}
+              required
+            />
+            <input
+              type="password"
+              placeholder="密码"
+              value={authPassword}
+              onChange={e => setAuthPassword(e.target.value)}
+              required
+              minLength={6}
+            />
+            {authError && <div className="auth-error">{authError}</div>}
+            <button type="submit" className="btn-primary auth-btn" disabled={authSubmitting}>
+              {authSubmitting ? '处理中...' : (authMode === 'login' ? '登录' : '注册')}
+            </button>
+          </form>
+          <div className="auth-switch">
+            {authMode === 'login' ? (
+              <span>还没有账号？<button className="link-btn" onClick={() => { setAuthMode('register'); setAuthError(''); }}>去注册</button></span>
+            ) : (
+              <span>已有账号？<button className="link-btn" onClick={() => { setAuthMode('login'); setAuthError(''); }}>去登录</button></span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) return <div className="loading">加载中...</div>;
 
   // Analytics
@@ -364,6 +431,13 @@ function App() {
         <div className="sidebar-stats">
           <div className="stat"><span className="stat-val">{activeTasks.length}</span><span className="stat-label">进行中</span></div>
           <div className="stat"><span className="stat-val">{completedTasks.length}</span><span className="stat-label">已完成</span></div>
+        </div>
+
+        <div className="sidebar-section">
+          <div className="user-info">
+            <span className="user-email" title={user.email}>{user.email}</span>
+            <button className="btn-secondary logout-btn" onClick={signOut}>退出登录</button>
+          </div>
         </div>
       </aside>
 

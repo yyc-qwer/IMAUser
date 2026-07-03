@@ -95,7 +95,7 @@
   // The schedule-app web page can't read chrome.storage, so we also encode
   // the data in the URL fragment as a fallback bridge.
 
-  var SCHEDULE_APP_URL = "http://localhost:5173";
+  var SCHEDULE_APP_URL = "https://imauser.pages.dev";
 
   async function pushToSchedule() {
     if (!extractedData || extractedData.length === 0) return;
