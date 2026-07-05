@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useTasks, isNotificationEnabled, setNotificationEnabled, requestNotificationPermission, calcProcrastinationIndex, getDeadlinePressure, getStreakData } from "./hooks/useTasks";
 import { useAuth } from "./hooks/useAuth";
 import { formatCountdown, fmtDate } from "./utils/dateUtils";
+import AIChat from "./components/AIChat";
 
 const COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
 
@@ -419,6 +420,10 @@ function App() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             导入数据
           </button>
+          <button className={`nav-btn ${view === "aiChat" ? "active" : ""}`} onClick={() => setView("aiChat")}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            AI 助手
+          </button>
         </nav>
 
         <div className="sidebar-section">
@@ -612,6 +617,18 @@ function App() {
               </div>
             </div>
           </>
+        )}
+
+        {view === "aiChat" && (
+          <AIChat
+            tasks={tasks}
+            taskTypes={taskTypes}
+            addTask={addTask}
+            updateTask={updateTask}
+            deleteTask={deleteTask}
+            toggleComplete={toggleComplete}
+            refresh={refresh}
+          />
         )}
 
         {showForm && (
