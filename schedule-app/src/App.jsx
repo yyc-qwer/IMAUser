@@ -3,6 +3,7 @@ import { useTasks, isNotificationEnabled, setNotificationEnabled, requestNotific
 import { useAuth } from "./hooks/useAuth";
 import { formatCountdown, fmtDate } from "./utils/dateUtils";
 import AIChat from "./components/AIChat";
+import SplashScreen from "./components/SplashScreen";
 
 const COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
 
@@ -166,6 +167,7 @@ function App() {
   const [authSubmitting, setAuthSubmitting] = useState(false);
 
   const [view, setView] = useState("tasks");
+  const [showSplash, setShowSplash] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [newTypeName, setNewTypeName] = useState("");
@@ -317,6 +319,8 @@ function App() {
   const weeklyStats = getWeeklyStats();
   const maxWeeklyCompleted = Math.max(1, ...weeklyStats.map(s => s.completed));
   const maxWeeklyCreated = Math.max(1, ...weeklyStats.map(s => s.created));
+
+  if (showSplash) return <SplashScreen onEnter={() => setShowSplash(false)} />;
 
   if (authLoading) return <div className="loading">检查登录状态...</div>;
 
