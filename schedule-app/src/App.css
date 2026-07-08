@@ -24,27 +24,31 @@ button:hover { opacity: 0.85; }
 .sidebar {
   background: var(--surface); border-right: 1px solid var(--border);
   display: flex; flex-direction: column;
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1), padding 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
-  position: relative;
+  position: fixed; left: 0; top: 0; height: 100vh;
+  z-index: 100;
 }
 
 /* 展开状态 */
 .sidebar.expanded {
   width: 220px; min-width: 220px;
   padding: 16px 12px;
+  box-shadow: 4px 0 24px rgba(0,0,0,0.15);
 }
 
 /* 收缩状态 */
 .sidebar.collapsed {
   width: 64px; min-width: 64px;
   padding: 16px 10px;
+  border-right: 1px solid var(--border);
 }
 
 /* 悬停展开（未固定时） */
 .sidebar.collapsed:hover {
   width: 220px; min-width: 220px;
   padding: 16px 12px;
+  box-shadow: 4px 0 24px rgba(0,0,0,0.15);
 }
 
 /* 头部 */
@@ -191,10 +195,10 @@ button:hover { opacity: 0.85; }
   opacity: 1; height: auto;
 }
 
-/* 主内容区域跟随侧边栏 */
+/* 主内容区域固定不变，侧边栏覆盖在上层 */
 .main {
   flex: 1; padding: 24px 32px; overflow-y: auto;
-  transition: margin-left 0.25s ease;
+  min-height: 100vh;
 }
 
 /* ===== Notification Toggle ===== */
@@ -773,9 +777,14 @@ button:hover { opacity: 0.85; }
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
   .app { flex-direction: column; }
-  .sidebar { width: 100%; min-width: 0; flex-direction: row; flex-wrap: wrap; padding: 12px; }
+  .sidebar { position: static; width: 100%; min-width: 0; flex-direction: row; flex-wrap: wrap; padding: 12px; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+  .sidebar.collapsed:hover, .sidebar.expanded { box-shadow: none; width: 100%; }
   .sidebar nav { flex-direction: row; gap: 4px; }
-  .main { padding: 16px; }
+  .sidebar-stats, .user-info { display: none !important; }
+  .sidebar-header { margin-bottom: 8px; }
+  .sidebar-pin-btn { display: none; }
+  .nav-label { opacity: 1 !important; width: auto !important; display: inline !important; }
+  .main { margin-left: 0; padding: 16px; }
   .task-grid { grid-template-columns: 1fr; }
   .filter-bar { flex-direction: column; align-items: stretch; }
   .search-input { max-width: none; }
