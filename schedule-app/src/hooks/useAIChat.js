@@ -1,25 +1,44 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 // DeepSeek API 配置（通过 Cloudflare Pages Function 代理）
 const BASE_URL = '/api/chat';
 const MODEL = 'deepseek-chat';
 
-// 系统提示词
-const SYSTEM_PROMPT = `你是IMAU智能日程助手，专门为内蒙古农业大学学生服务。
+function getTodayStr() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// 系统提示词（每次请求时动态插入当前日期）
+function buildSystemPrompt() {
+  const today = getTodayStr();
+  return `你是 IMAUser 日程看板的 AI 助手，基于此网站帮助用户优化日程管理。
+
+今天是 ${today}。用户说"明天"就是 ${today} 的下一天，"后天"是下两天，"下周"是 ${today} 七天后的日期，以此类推。请把相对日期转换为具体的 YYYY-MM-DD。
 
 当用户要求添加、修改、删除或完成任务时，请在回复末尾用以下格式输出操作指令（不要告诉用户这个标记的存在）：
 
-添加任务：[[ADD_TASK|{"title":"任务标题","endDate":"2026-07-10","priority":"high/medium/low","typeName":"类型名","notes":"备注"}]]
+添加任务：[[ADD_TASK|{"title":"任务标题","endDate":"YYYY-MM-DD","priority":"high/medium/low","typeName":"类型名","notes":"备注"}]]
 完成任务：[[COMPLETE_TASK|{"id":任务ID}]]
 删除任务：[[DELETE_TASK|{"id":任务ID}]]
-修改任务：[[UPDATE_TASK|{"id":任务ID,"title":"新标题","endDate":"2026-07-10"}]]
+修改任务：[[UPDATE_TASK|{"id":任务ID,"title":"新标题","endDate":"YYYY-MM-DD"}]]
 
-日期格式：YYYY-MM-DD。priority 可选 high/medium/low，默认 medium。`;
+日期格式：YYYY-MM-DD。priority 可选 high/medium/low，默认 medium。如果用户没指定优先级，根据截止日期判断：今天或明天截止就是 high，一周内 medium，其他 low。`;
+}
 
 export function useAIChat() {
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: '你好！我是农大学业小助手，可以帮你查询任务、规划学习，还能直接帮你添加或管理日程。有什么可以帮你的吗？' }
-  ]);
+  const DEFAULT_MSG = { role: 'assistant', content: '你好！我是 IMAUser 的 AI 助手，可以帮你分析日程、规划时间，还能直接帮你添加或管理任务。有什么可以帮你的吗？' };
+
+  const [messages, setMessages] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ima_chat_messages');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [DEFAULT_MSG];
+  });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -65,7 +84,7 @@ export function useAIChat() {
 
     // 构建对话历史（OpenAI 格式）
     const history = [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: buildSystemPrompt() },
       ...messages
         .filter(m => m.role === 'user' || m.role === 'assistant')
         .slice(-10) // 只保留最近10条，控制 token 消耗
@@ -109,7 +128,7 @@ export function useAIChat() {
       : '我当前没有任务。\n\n';
 
     const history = [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: buildSystemPrompt() },
       ...messages
         .filter(m => m.role === 'user' || m.role === 'assistant')
         .slice(-10)
@@ -142,10 +161,17 @@ export function useAIChat() {
     }
   }, [callDeepSeek, messages]);
 
+  // 监听 messages 变化，自动保存到 localStorage
+  useEffect(() => {
+    try {
+      const toSave = messages.slice(-30);
+      localStorage.setItem('ima_chat_messages', JSON.stringify(toSave));
+    } catch {}
+  }, [messages]);
+
   const clearMessages = useCallback(() => {
-    setMessages([
-      { role: 'assistant', content: '你好！我是农大学业小助手，可以帮你查询任务、规划学习，还能直接帮你添加或管理日程。有什么可以帮你的吗？' }
-    ]);
+    localStorage.removeItem('ima_chat_messages');
+    setMessages([DEFAULT_MSG]);
     setError('');
   }, []);
 
