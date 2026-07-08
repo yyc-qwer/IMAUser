@@ -882,14 +882,51 @@ button:hover { opacity: 0.85; }
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
   .app { flex-direction: column; }
-  .sidebar { position: static; width: 100%; min-width: 0; flex-direction: row; flex-wrap: wrap; padding: 12px; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
-  .sidebar.collapsed:hover, .sidebar.expanded { box-shadow: none; width: 100%; }
-  .sidebar nav { flex-direction: row; gap: 4px; }
-  .sidebar-stats, .user-info { display: none !important; }
-  .sidebar-header { margin-bottom: 8px; }
-  .sidebar-pin-btn { display: none; }
+
+  /* 侧边栏 — 手机端变成顶部导航条 */
+  .sidebar {
+    position: static; width: 100%; min-width: 0;
+    flex-direction: row; flex-wrap: wrap;
+    padding: 8px 12px; height: auto;
+    border-right: none; border-bottom: 1px solid var(--border);
+  }
+  .sidebar.collapsed:hover, .sidebar.expanded {
+    box-shadow: none; width: 100%; background: var(--bg);
+  }
+  .sidebar-header { width: 100%; margin-bottom: 4px; }
+  .logo { padding: 0; }
+  .sidebar.collapsed .logo { justify-content: flex-start; }
+  .sidebar.collapsed .logo svg, .sidebar.expanded .logo svg { width: 20px; height: 20px; }
+  .sidebar.collapsed .logo-text, .sidebar.expanded .logo-text { opacity: 1; width: auto; }
+  .sidebar-pin-btn { display: none !important; }
+
+  .sidebar nav {
+    flex-direction: row; flex-wrap: wrap; gap: 4px;
+    width: 100%;
+  }
+  .nav-btn {
+    padding: 6px 10px; font-size: 12px; gap: 6px;
+    flex: 1; min-width: 70px; justify-content: center;
+  }
   .nav-label { opacity: 1 !important; width: auto !important; display: inline !important; }
-  .main { margin-left: 0; padding: 16px; }
+
+  .sidebar-stats, .user-info, .notif-toggle { display: none !important; }
+
+  /* 主内容 */
+  .main { margin-left: 0 !important; padding: 16px !important; }
+  .main.pushed { margin-left: 0 !important; padding: 16px !important; }
+
+  /* 骨架屏适配 */
+  .skeleton-container { flex-direction: column; }
+  .skeleton-sidebar { width: 100%; min-width: 0; flex-direction: row; flex-wrap: wrap; padding: 8px 12px; height: auto; }
+  .skeleton-logo { margin: 0 8px 0 0; }
+  .skeleton-nav { flex-direction: row; flex-wrap: wrap; gap: 4px; flex: 1; }
+  .skeleton-nav-item { height: 32px; flex: 1; min-width: 60px; }
+  .skeleton-stats { display: none; }
+  .skeleton-main { padding: 16px; }
+  .skeleton-grid { grid-template-columns: 1fr; }
+
+  /* 其他 */
   .task-grid { grid-template-columns: 1fr; }
   .filter-bar { flex-direction: column; align-items: stretch; }
   .search-input { max-width: none; }
