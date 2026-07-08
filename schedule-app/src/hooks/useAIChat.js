@@ -74,13 +74,15 @@ export function useAIChat() {
     setInput('');
     setError('');
 
-    // 构建任务上下文
+    // 构建任务上下文（自然语言格式）
     const taskContext = userTasks.length > 0
-      ? `我当前的任务列表：\n${userTasks.map(t => {
+      ? `我的任务：\n${userTasks.map((t, i) => {
           const typeStr = t.typeName || '未分类';
-          return `- [${t.completed ? '✓' : ' '}] ${t.title}（类型：${typeStr}，截止：${t.endDate || '无'}，优先级：${t.priority || 'medium'}，ID：${t.id}）`;
+          const doneMark = t.completed ? ' ✅' : '';
+          const priText = t.priority === 'high' ? '高' : t.priority === 'medium' ? '中' : '低';
+          return `${i + 1}. ${t.title}，${typeStr}类，${t.endDate || '无截止日期'}截止，优先级${priText}${doneMark}`;
         }).join('\n')}\n\n`
-      : '我当前没有任务。\n\n';
+      : '我现在没有任务。\n\n';
 
     // 构建对话历史（OpenAI 格式）
     const history = [
@@ -121,11 +123,13 @@ export function useAIChat() {
     setError('');
 
     const taskContext = userTasks.length > 0
-      ? `我当前的任务列表：\n${userTasks.map(t => {
+      ? `我的任务：\n${userTasks.map((t, i) => {
           const typeStr = t.typeName || '未分类';
-          return `- [${t.completed ? '✓' : ' '}] ${t.title}（类型：${typeStr}，截止：${t.endDate || '无'}，优先级：${t.priority || 'medium'}，ID：${t.id}）`;
+          const doneMark = t.completed ? ' ✅' : '';
+          const priText = t.priority === 'high' ? '高' : t.priority === 'medium' ? '中' : '低';
+          return `${i + 1}. ${t.title}，${typeStr}类，${t.endDate || '无截止日期'}截止，优先级${priText}${doneMark}`;
         }).join('\n')}\n\n`
-      : '我当前没有任务。\n\n';
+      : '我现在没有任务。\n\n';
 
     const history = [
       { role: 'system', content: buildSystemPrompt() },
