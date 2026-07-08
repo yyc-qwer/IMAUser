@@ -186,6 +186,46 @@ function App() {
     priority: "medium", reminderAt: "", repeatRule: "none", source: "manual"
   });
 
+  // 任务到期提醒检查
+  useEffect(() => {
+    if (!notifEnabled || Notification.permission !== 'granted') return;
+
+    const checkDeadlines = () => {
+      const now = new Date();
+      const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      const notifiedKey = 'ima_notified_tasks';
+      let notified = {};
+      try { notified = JSON.parse(localStorage.getItem(notifiedKey) || '{}'); } catch {}
+
+      activeTasks.forEach(t => {
+        if (!t.endDate || t.completed) return;
+        const end = new Date(t.endDate + 'T23:59:59');
+        if (end <= tomorrow && end > now) {
+          const key = `${t.id}_${new Date().toISOString().slice(0, 10)}`;
+          if (!notified[key]) {
+            new Notification('任务即将到期', {
+              body: `「${t.title}」将于 ${t.endDate} 截止，请尽快处理`,
+              icon: '/favicon.ico'
+            });
+            notified[key] = true;
+          }
+        }
+      });
+
+      // 清理7天前的记录
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      Object.keys(notified).forEach(k => {
+        const date = k.split('_')[1];
+        if (date < weekAgo) delete notified[k];
+      });
+      localStorage.setItem(notifiedKey, JSON.stringify(notified));
+    };
+
+    checkDeadlines(); // 立即检查一次
+    const id = setInterval(checkDeadlines, 5 * 60 * 1000); // 每5分钟
+    return () => clearInterval(id);
+  }, [notifEnabled, activeTasks]);
+
   const openNew = () => {
     setEditingTask(null);
     setForm({
