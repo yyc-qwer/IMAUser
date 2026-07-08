@@ -4,6 +4,7 @@ import { useAuth } from "./hooks/useAuth";
 import { formatCountdown, fmtDate } from "./utils/dateUtils";
 import AIChat from "./components/AIChat";
 import SplashScreen from "./components/SplashScreen";
+import Skeleton from "./components/Skeleton";
 
 const COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
 
@@ -323,7 +324,7 @@ function App() {
 
   if (showSplash) return <SplashScreen onEnter={() => setShowSplash(false)} />;
 
-  if (authLoading) return <div className="loading">检查登录状态...</div>;
+  if (authLoading) return <Skeleton />;
 
   // ===== Login / Register View =====
   if (!user) {
@@ -380,7 +381,7 @@ function App() {
     );
   }
 
-  if (loading) return <div className="loading">加载中...</div>;
+  if (loading) return <Skeleton />;
 
   // Analytics
   const monthlyDistribution = {};
