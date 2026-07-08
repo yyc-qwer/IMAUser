@@ -20,24 +20,23 @@ export default function SplashScreen({ onEnter }) {
     resize();
     window.addEventListener('resize', resize);
 
-    // 粒子
+    // 粒子（减少数量，优化性能）
     const particles = [];
-    const count = Math.min(120, Math.floor((w * h) / 12000));
+    const count = Math.min(50, Math.floor((w * h) / 25000));
     for (let i = 0; i < count; i++) {
       particles.push({
         x: Math.random() * w,
         y: Math.random() * h,
-        vx: (Math.random() - 0.5) * 0.5,
-        vy: (Math.random() - 0.5) * 0.5,
-        radius: Math.random() * 2 + 0.5,
-        alpha: Math.random() * 0.5 + 0.2,
+        vx: (Math.random() - 0.5) * 0.4,
+        vy: (Math.random() - 0.5) * 0.4,
+        radius: Math.random() * 1.5 + 0.5,
+        alpha: Math.random() * 0.4 + 0.2,
       });
     }
 
     let animId;
     const draw = () => {
-      ctx.fillStyle = 'rgba(15, 17, 23, 0.15)';
-      ctx.fillRect(0, 0, w, h);
+      ctx.clearRect(0, 0, w, h);
 
       // 更新和绘制粒子
       for (let i = 0; i < particles.length; i++) {
@@ -53,17 +52,18 @@ export default function SplashScreen({ onEnter }) {
         ctx.fillStyle = `rgba(59, 130, 246, ${p.alpha})`;
         ctx.fill();
 
-        // 连线
-        for (let j = i + 1; j < particles.length; j++) {
+        // 连线（限制每帧最多检查 5 个邻居，减少计算量）
+        for (let j = i + 1; j < Math.min(i + 6, particles.length); j++) {
           const p2 = particles[j];
           const dx = p.x - p2.x;
           const dy = p.y - p2.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 120) {
+          const distSq = dx * dx + dy * dy;
+          if (distSq < 14400) { // 120^2，避免开方
+            const dist = Math.sqrt(distSq);
             ctx.beginPath();
             ctx.moveTo(p.x, p.y);
             ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = `rgba(59, 130, 246, ${0.08 * (1 - dist / 120)})`;
+            ctx.strokeStyle = `rgba(59, 130, 246, ${0.06 * (1 - dist / 120)})`;
             ctx.lineWidth = 0.5;
             ctx.stroke();
           }
