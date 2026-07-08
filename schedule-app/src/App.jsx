@@ -468,7 +468,7 @@ function App() {
         </div>
       </aside>
 
-      <main className="main">
+      <main className={`main ${sidebarExpanded ? 'pushed' : ''}`}>
         {view === "tasks" && (
           <>
             <header className="main-header">

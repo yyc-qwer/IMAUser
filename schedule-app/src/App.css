@@ -20,44 +20,42 @@ button:hover { opacity: 0.85; }
 /* ===== Layout ===== */
 .app { display: flex; min-height: 100vh; }
 
-/* 侧边栏基础 */
+/* 侧边栏基础 — 收缩时跟主内容背景一致，看起来一体 */
 .sidebar {
-  background: var(--surface);
+  background: var(--bg);
   display: flex; flex-direction: column;
-  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1), padding 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1), padding 0.5s cubic-bezier(0.4, 0, 0.2, 1), background 0.4s ease;
   overflow: hidden;
   position: fixed; left: 0; top: 0; height: 100vh;
   z-index: 100;
 }
 
-/* 侧边栏右侧细线 */
+/* 侧边栏右侧细线 — 一直到底 */
 .sidebar::after {
   content: ''; position: absolute; right: 0; top: 0; bottom: 0;
   width: 1px; background: var(--border);
-  transition: opacity 0.35s ease;
   opacity: 1;
 }
 
-/* 展开状态 */
+/* 展开状态 — 固定展开 */
 .sidebar.expanded {
+  background: var(--surface);
   width: 220px; min-width: 220px;
   padding: 16px 12px;
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.04), 4px 0 24px rgba(0,0,0,0.08);
-  border-radius: 0 12px 12px 0;
 }
 
-/* 收缩状态 */
+/* 收缩状态 — 跟主内容一体 */
 .sidebar.collapsed {
   width: 64px; min-width: 64px;
   padding: 16px 10px;
 }
 
-/* 悬停展开（未固定时） */
+/* 悬停展开 — 未固定时弹出覆盖 */
 .sidebar.collapsed:hover {
+  background: var(--surface);
   width: 220px; min-width: 220px;
   padding: 16px 12px;
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.04), 4px 0 24px rgba(0,0,0,0.08);
-  border-radius: 0 12px 12px 0;
+  box-shadow: 4px 0 32px rgba(0,0,0,0.25);
 }
 
 /* 头部 */
@@ -205,10 +203,17 @@ button:hover { opacity: 0.85; }
   opacity: 1; height: auto;
 }
 
-/* 主内容区域固定不变，侧边栏覆盖在上层 */
+/* 主内容区域 */
 .main {
   flex: 1; padding: 24px 32px 24px 88px; overflow-y: auto;
   min-height: 100vh;
+  transition: margin-left 0.5s cubic-bezier(0.4, 0, 0.2, 1), padding-left 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 固定展开时主内容推过去 */
+.main.pushed {
+  margin-left: 220px;
+  padding-left: 32px;
 }
 
 /* ===== Notification Toggle ===== */
