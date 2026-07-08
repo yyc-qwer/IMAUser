@@ -168,6 +168,7 @@ function App() {
 
   const [view, setView] = useState("tasks");
   const [showSplash, setShowSplash] = useState(true);
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [newTypeName, setNewTypeName] = useState("");
@@ -401,32 +402,49 @@ function App() {
 
   return (
     <div className="app">
-      <aside className="sidebar">
-        <h1 className="logo">日程看板</h1>
+      <aside className={`sidebar ${sidebarExpanded ? 'expanded' : 'collapsed'}`}>
+        <div className="sidebar-header">
+          <h1 className="logo">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span className="logo-text">日程看板</span>
+          </h1>
+          <button
+            className="sidebar-pin-btn"
+            title={sidebarExpanded ? '收起侧边栏' : '固定展开'}
+            onClick={() => setSidebarExpanded(!sidebarExpanded)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              {sidebarExpanded
+                ? <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>
+                : <><line x1="17" y1="10" x2="3" y2="10"/><polyline points="10 3 3 10 10 17"/></>
+              }
+            </svg>
+          </button>
+        </div>
         <nav>
           <button className={`nav-btn ${view === "tasks" ? "active" : ""}`} onClick={() => setView("tasks")}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            任务列表
+            <span className="nav-label">任务列表</span>
           </button>
           <button className={`nav-btn ${view === "types" ? "active" : ""}`} onClick={() => setView("types")}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-            任务类型
+            <span className="nav-label">任务类型</span>
           </button>
           <button className={`nav-btn ${view === "analytics" ? "active" : ""}`} onClick={() => setView("analytics")}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>
-            数据分析
+            <span className="nav-label">数据分析</span>
           </button>
           <button className={`nav-btn ${view === "pomodoro" ? "active" : ""}`} onClick={() => setView("pomodoro")}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            番茄钟
+            <span className="nav-label">番茄钟</span>
           </button>
           <button className={`nav-btn ${view === "import" ? "active" : ""}`} onClick={() => setView("import")}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            导入数据
+            <span className="nav-label">导入数据</span>
           </button>
           <button className={`nav-btn ${view === "aiChat" ? "active" : ""}`} onClick={() => setView("aiChat")}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-            AI 助手
+            <span className="nav-label">AI 助手</span>
           </button>
         </nav>
 
