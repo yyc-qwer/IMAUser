@@ -24,7 +24,7 @@ button:hover { opacity: 0.85; }
 .sidebar {
   background: var(--surface); border-right: 1px solid var(--border);
   display: flex; flex-direction: column;
-  transition: width 0.25s ease, padding 0.25s ease;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   position: relative;
 }
@@ -37,8 +37,8 @@ button:hover { opacity: 0.85; }
 
 /* 收缩状态 */
 .sidebar.collapsed {
-  width: 56px; min-width: 56px;
-  padding: 16px 8px;
+  width: 64px; min-width: 64px;
+  padding: 16px 10px;
 }
 
 /* 悬停展开（未固定时） */
@@ -60,10 +60,25 @@ button:hover { opacity: 0.85; }
   margin: 0; padding: 0; white-space: nowrap;
 }
 
+/* 收缩时 logo 图标调大 */
+.sidebar.collapsed .logo {
+  justify-content: center;
+}
+.sidebar.collapsed .logo svg {
+  width: 24px; height: 24px;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.sidebar.collapsed:hover .logo svg {
+  width: 22px; height: 22px;
+}
+.sidebar.expanded .logo svg {
+  width: 22px; height: 22px;
+}
+
 /* 收缩时 logo 文字隐藏 */
 .sidebar.collapsed .logo-text {
   opacity: 0; width: 0; overflow: hidden;
-  transition: opacity 0.2s ease, width 0.2s ease;
+  transition: opacity 0.25s ease, width 0.25s ease;
 }
 .sidebar.expanded .logo-text,
 .sidebar.collapsed:hover .logo-text {
@@ -95,15 +110,31 @@ button:hover { opacity: 0.85; }
   display: flex; align-items: center; gap: 10px;
   padding: 10px 12px; border: none; border-radius: var(--radius);
   color: var(--text2); font-size: 14px;
-  transition: background 0.15s;
+  transition: background 0.15s, padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), gap 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
 }
 .nav-btn:hover { background: var(--surface2); color: var(--text); }
 .nav-btn.active { background: var(--surface2); color: var(--primary); font-weight: 600; }
 
+/* 收缩时导航按钮图标放大 */
+.sidebar.collapsed .nav-btn {
+  padding: 10px 8px;
+  justify-content: center;
+}
+.sidebar.collapsed .nav-btn svg {
+  width: 20px; height: 20px;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.sidebar.collapsed:hover .nav-btn svg {
+  width: 18px; height: 18px;
+}
+.sidebar.expanded .nav-btn svg {
+  width: 18px; height: 18px;
+}
+
 /* 导航文字过渡 */
 .nav-label {
-  transition: opacity 0.2s ease, width 0.2s ease;
+  transition: opacity 0.25s ease, width 0.25s ease;
   overflow: hidden;
 }
 .sidebar.collapsed .nav-label {
