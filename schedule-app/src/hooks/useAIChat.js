@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 
 // DeepSeek API 配置（通过 Cloudflare Pages Function 代理）
 const BASE_URL = '/api/chat';
-const MODEL = 'deepseek-chat';
+const MODEL = 'deepseek-v4-flash';
 
 function getTodayStr() {
   const d = new Date();
