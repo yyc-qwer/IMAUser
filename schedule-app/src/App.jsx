@@ -798,27 +798,11 @@ function TaskCard({ task, typeName, color, done, onToggle, onEdit, onDelete, onE
       <div className="task-bottom">
         <span className={`countdown${cd.urgent ? " urgent" : ""}`}>{cd.text}</span>
         <div className="task-bottom-actions">
-          <button className="btn-icon-sm expand-btn" onClick={onExpand} title="子任务">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
           <button className={`toggle-btn${done ? " done" : ""}`} onClick={onToggle}>
             {done ? "↩ 恢复" : "✓ 完成"}
           </button>
         </div>
       </div>
-
-      {expanded && (
-        <div className="task-expanded">
-          <SubtaskList
-            taskId={task.id}
-            getSubtasks={subtaskProps.getSubtasks}
-            addSubtask={subtaskProps.addSubtask}
-            toggleSubtask={subtaskProps.toggleSubtask}
-            deleteSubtask={subtaskProps.deleteSubtask}
-            onUpdate={() => subtaskProps.setSubtaskRefreshKey(k => k + 1)}
-          />
-        </div>
-      )}
     </div>
   );
 }

@@ -10,34 +10,43 @@ export default function NotionBlockEditor({ taskId }) {
   const [focusId, setFocusId] = useState(null);
   const [convertMenu, setConvertMenu] = useState(null);
   const editorRef = useRef(null);
+  const loadedRef = useRef(false);
 
   const load = useCallback(async () => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
     const list = await getBlocks(taskId);
     if (list.length === 0) {
       const h = await addBlock(taskId, 'heading', '', 0);
       const t = await addBlock(taskId, 'text', '', 1);
-      setBlocks([h, t].filter(Boolean));
+      if (h && t) setBlocks([h, t]);
+      else if (h) setBlocks([h]);
+      else if (t) setBlocks([t]);
     } else {
       setBlocks(list);
     }
-  }, [taskId]);
+  }, [taskId, getBlocks, addBlock]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    loadedRef.current = false;
+    load();
+  }, [load]);
 
-  const refresh = async () => {
-    const list = await getBlocks(taskId);
-    setBlocks(list);
+  const saveOrder = async (newBlocks) => {
+    const ids = newBlocks.map(b => b.id);
+    await reorderBlocks(ids);
   };
 
   const handleAdd = async (afterIdx, type = 'text') => {
-    const order = afterIdx + 1;
+    const insertIdx = afterIdx + 1;
     const indent = blocks[afterIdx]?.indent || 0;
-    const b = await addBlock(taskId, type, '', order, indent);
+    const b = await addBlock(taskId, type, '', insertIdx, indent);
     if (!b) return;
     const newBlocks = [...blocks];
-    newBlocks.splice(order, 0, b);
-    setBlocks(newBlocks.map((blk, i) => ({ ...blk, order: i })));
-    await reorderBlocks(taskId, newBlocks.map(b => b.id));
+    newBlocks.splice(insertIdx, 0, b);
+    const reordered = newBlocks.map((blk, i) => ({ ...blk, order: i }));
+    setBlocks(reordered);
+    await saveOrder(reordered);
     setFocusId(b.id);
   };
 
@@ -49,25 +58,26 @@ export default function NotionBlockEditor({ taskId }) {
   const handleToggle = async (id) => {
     const b = blocks.find(x => x.id === id);
     if (!b) return;
-    const meta = { ...(b.meta || {}), checked: !(b.meta?.checked || false) };
-    setBlocks(prev => prev.map(x => x.id === id ? { ...x, meta } : x));
-    await updateBlock(id, { meta });
+    const newMeta = { ...(b.meta || {}), checked: !(b.meta?.checked || false) };
+    setBlocks(prev => prev.map(x => x.id === id ? { ...x, meta: newMeta } : x));
+    await updateBlock(id, { meta: newMeta });
   };
 
   const handleToggleCollapse = async (id) => {
     const b = blocks.find(x => x.id === id);
     if (!b) return;
-    const meta = { ...(b.meta || {}), collapsed: !(b.meta?.collapsed || false) };
-    setBlocks(prev => prev.map(x => x.id === id ? { ...x, meta } : x));
-    await updateBlock(id, { meta });
+    const newMeta = { ...(b.meta || {}), collapsed: !(b.meta?.collapsed || false) };
+    setBlocks(prev => prev.map(x => x.id === id ? { ...x, meta: newMeta } : x));
+    await updateBlock(id, { meta: newMeta });
   };
 
   const handleDelete = async (id) => {
     if (blocks.length <= 1) return;
     await deleteBlock(id);
     const newBlocks = blocks.filter(b => b.id !== id);
-    setBlocks(newBlocks.map((b, i) => ({ ...b, order: i })));
-    await reorderBlocks(taskId, newBlocks.map(b => b.id));
+    const reordered = newBlocks.map((b, i) => ({ ...b, order: i }));
+    setBlocks(reordered);
+    await saveOrder(reordered);
   };
 
   const handleTypeChange = async (id, newType) => {
@@ -96,9 +106,10 @@ export default function NotionBlockEditor({ taskId }) {
     const newBlocks = [...blocks];
     const [removed] = newBlocks.splice(from, 1);
     newBlocks.splice(to, 0, removed);
-    setBlocks(newBlocks.map((b, i) => ({ ...b, order: i })));
+    const reordered = newBlocks.map((b, i) => ({ ...b, order: i }));
+    setBlocks(reordered);
     setDragId(null);
-    await reorderBlocks(taskId, newBlocks.map(b => b.id));
+    await saveOrder(reordered);
   };
 
   const renderBlockContent = (b) => {
@@ -117,7 +128,7 @@ export default function NotionBlockEditor({ taskId }) {
         return (
           <div className="block-todo-row">
             <input type="checkbox" checked={!!b.meta?.checked} onChange={() => handleToggle(b.id)} />
-            <input {...commonProps} style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text)' }} />
+            <input {...commonProps} />
           </div>
         );
       case 'toggle':
@@ -126,24 +137,25 @@ export default function NotionBlockEditor({ taskId }) {
             <button className="toggle-btn-small" onClick={() => handleToggleCollapse(b.id)}>
               {b.meta?.collapsed ? '▶' : '▼'}
             </button>
-            <input {...commonProps} style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text)' }} />
+            <input {...commonProps} />
           </div>
         );
       case 'bulleted_list':
         return (
           <div className="block-list-row">
             <span className="list-bullet">•</span>
-            <input {...commonProps} style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text)' }} />
+            <input {...commonProps} />
           </div>
         );
-      case 'numbered_list':
+      case 'numbered_list': {
         const idx = blocks.filter(x => x.type === 'numbered_list' && x.order <= b.order).length;
         return (
           <div className="block-list-row">
             <span className="list-number">{idx}.</span>
-            <input {...commonProps} style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text)' }} />
+            <input {...commonProps} />
           </div>
         );
+      }
       default:
         return <input {...commonProps} />;
     }
@@ -160,8 +172,8 @@ export default function NotionBlockEditor({ taskId }) {
 
     if (e.key === 'Backspace' && b?.content === '' && blocks.length > 1) {
       e.preventDefault();
-      handleDelete(id);
       const prev = blocks[idx - 1];
+      handleDelete(id);
       if (prev) setFocusId(prev.id);
     }
 
@@ -173,11 +185,24 @@ export default function NotionBlockEditor({ taskId }) {
 
   useEffect(() => {
     if (focusId) {
-      const el = editorRef.current?.querySelector(`[data-block-id="${focusId}"] input`);
-      el?.focus();
-      setFocusId(null);
+      setTimeout(() => {
+        const el = editorRef.current?.querySelector(`[data-block-id="${focusId}"] input`);
+        el?.focus();
+        setFocusId(null);
+      }, 50);
     }
   }, [focusId]);
+
+  // 点击外部关闭菜单
+  useEffect(() => {
+    const click = (e) => {
+      if (editorRef.current && !editorRef.current.contains(e.target)) {
+        setConvertMenu(null);
+      }
+    };
+    document.addEventListener('click', click);
+    return () => document.removeEventListener('click', click);
+  }, []);
 
   const getPlaceholder = (type) => {
     const map = {
@@ -207,25 +232,23 @@ export default function NotionBlockEditor({ taskId }) {
           onMouseLeave={() => setHoverId(null)}
           data-block-id={b.id}
         >
-          {/* 左侧操作区 */}
           <div className={`block-actions ${hoverId === b.id ? 'visible' : ''}`}>
-            <button className="block-add" title="下方添加" onClick={() => handleAdd(i)}>+</button>
+            <button className="block-add" title="下方添加" onClick={(e) => { e.stopPropagation(); handleAdd(i); }}>+</button>
             <button
               className="block-handle"
               title="拖拽排序 / 转换类型"
               onClick={(e) => {
+                e.stopPropagation();
                 const rect = e.currentTarget.getBoundingClientRect();
                 setConvertMenu({ x: rect.left, y: rect.bottom + 4, blockId: b.id });
               }}
             >⋮⋮</button>
           </div>
 
-          {/* 内容区 */}
           {renderBlockContent(b)}
         </div>
       ))}
 
-      {/* 转换菜单 */}
       {convertMenu && (
         <div className="convert-menu" style={{ left: convertMenu.x, top: convertMenu.y }}>
           <div className="convert-item" onClick={() => handleTypeChange(convertMenu.blockId, 'text')}>📝 文本</div>
