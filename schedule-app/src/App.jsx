@@ -181,7 +181,6 @@ function App() {
   const [filterPriority, setFilterPriority] = useState("");
   const [expandedTask, setExpandedTask] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
-  const [subtaskRefreshKey, setSubtaskRefreshKey] = useState(0);
 
   const [form, setForm] = useState({
     title: "", typeId: "", startDate: "", endDate: "", notes: "",
@@ -270,6 +269,36 @@ function App() {
     setShowForm(false);
   };
 
+  // URL hash 导入（来自浏览器扩展推送）
+  const hashImportDone = useRef(false);
+  useEffect(() => {
+    if (hashImportDone.current || loading || !user || taskTypes.length === 0) return;
+    const hash = window.location.hash;
+    if (!hash.startsWith('#import=')) return;
+    hashImportDone.current = true;
+
+    try {
+      const encoded = hash.slice('#import='.length);
+      const data = JSON.parse(decodeURIComponent(encoded));
+      if (!Array.isArray(data) || data.length === 0) return;
+      (async () => {
+        for (const item of data) {
+          await addTask({
+            title: item.title || item.name || '未命名任务',
+            typeId: taskTypes[0]?.id || null,
+            startDate: item.startDate || item.start || null,
+            endDate: item.endDate || item.end || item.deadline || null,
+            notes: item.notes || item.description || (item.course ? `${item.course} | ${item.type}` : ''),
+            priority: 'medium',
+            source: 'school',
+          });
+        }
+        // 清理 hash 避免刷新重复导入
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+      })();
+    } catch { /* 忽略无效 hash */ }
+  }, [loading, user, taskTypes, addTask]);
+
   const handleAddType = async () => {
     if (!newTypeName.trim()) return;
     await addTaskType({ name: newTypeName.trim(), color: newTypeColor });
@@ -280,7 +309,7 @@ function App() {
     try {
       const text = await navigator.clipboard.readText();
       const imported = JSON.parse(text);
-      if (Array.isArray(imported)) {
+      if (Array.isArray(imported) && imported.length > 0) {
         for (const item of imported) {
           await addTask({
             title: item.title || item.name || "未命名任务",
@@ -292,6 +321,7 @@ function App() {
             source: "school",
           });
         }
+        alert(`成功导入 ${imported.length} 个任务`);
       }
     } catch (err) {
       alert("导入失败，请确保已从浏览器插件复制了正确的任务数据（JSON 格式）。\n\n提示：使用浏览器插件点击\"写入日程看板\"后，在此页面点击\"从存储拉取\"导入。");
@@ -552,7 +582,7 @@ function App() {
                       onToggle={() => toggleComplete(t.id)} onEdit={() => openEdit(t)} onDelete={() => deleteTask(t.id)}
                       onExpand={() => setExpandedTask(expandedTask === t.id ? null : t.id)}
                       onOpenDetail={() => { setSelectedTask(t); setView("taskDetail"); }}
-                      subtaskProps={{ getSubtasks, addSubtask, toggleSubtask, deleteSubtask, subtaskRefreshKey, setSubtaskRefreshKey }} />
+                      subtaskProps={{ getSubtasks, addSubtask, toggleSubtask, deleteSubtask }} />
                   ))}
                 </div>
               </section>
@@ -568,7 +598,7 @@ function App() {
                       onToggle={() => toggleComplete(t.id)} onEdit={() => openEdit(t)} onDelete={() => deleteTask(t.id)}
                       onExpand={() => setExpandedTask(expandedTask === t.id ? null : t.id)}
                       onOpenDetail={() => { setSelectedTask(t); setView("taskDetail"); }}
-                      subtaskProps={{ getSubtasks, addSubtask, toggleSubtask, deleteSubtask, subtaskRefreshKey, setSubtaskRefreshKey }} />
+                      subtaskProps={{ getSubtasks, addSubtask, toggleSubtask, deleteSubtask }} />
                   ))}
                 </div>
               </section>
@@ -654,18 +684,7 @@ function App() {
               <div className="import-card">
                 <h3>手动粘贴 JSON</h3>
                 <p>如果你已经有导出的 JSON 数据，可以直接粘贴。</p>
-                <button className="btn-secondary" onClick={async () => {
-                  try {
-                    const text = await navigator.clipboard.readText();
-                    const imported = JSON.parse(text);
-                    if (Array.isArray(imported)) {
-                      for (const item of imported) {
-                        await addTask({ title: item.title || item.name || "未命名", typeId: taskTypes[0]?.id || null, startDate: item.startDate || item.start || null, endDate: item.endDate || item.end || item.deadline || null, notes: item.notes || item.description || "", priority: "medium", source: "school" });
-                      }
-                      alert("成功导入 " + imported.length + " 个任务");
-                    }
-                  } catch { alert("粘贴板中没有有效的 JSON 数据"); }
-                }}>读取剪贴板 JSON</button>
+                <button className="btn-secondary" onClick={handleImport}>读取剪贴板 JSON</button>
               </div>
               <div className="import-card">
                 <h3>导出数据</h3>
