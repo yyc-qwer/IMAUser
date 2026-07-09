@@ -5,6 +5,7 @@ import { formatCountdown, fmtDate } from "./utils/dateUtils";
 import AIChat from "./components/AIChat";
 import SplashScreen from "./components/SplashScreen";
 import Skeleton from "./components/Skeleton";
+import TaskDetailPage from "./components/TaskDetailPage";
 
 const COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
 
@@ -179,6 +180,7 @@ function App() {
   const [filterType, setFilterType] = useState("");
   const [filterPriority, setFilterPriority] = useState("");
   const [expandedTask, setExpandedTask] = useState(null);
+  const [selectedTask, setSelectedTask] = useState(null);
   const [subtaskRefreshKey, setSubtaskRefreshKey] = useState(0);
 
   const [form, setForm] = useState({
@@ -549,6 +551,7 @@ function App() {
                       expanded={expandedTask === t.id}
                       onToggle={() => toggleComplete(t.id)} onEdit={() => openEdit(t)} onDelete={() => deleteTask(t.id)}
                       onExpand={() => setExpandedTask(expandedTask === t.id ? null : t.id)}
+                      onOpenDetail={() => { setSelectedTask(t); setView("taskDetail"); }}
                       subtaskProps={{ getSubtasks, addSubtask, toggleSubtask, deleteSubtask, subtaskRefreshKey, setSubtaskRefreshKey }} />
                   ))}
                 </div>
@@ -564,6 +567,7 @@ function App() {
                       expanded={expandedTask === t.id}
                       onToggle={() => toggleComplete(t.id)} onEdit={() => openEdit(t)} onDelete={() => deleteTask(t.id)}
                       onExpand={() => setExpandedTask(expandedTask === t.id ? null : t.id)}
+                      onOpenDetail={() => { setSelectedTask(t); setView("taskDetail"); }}
                       subtaskProps={{ getSubtasks, addSubtask, toggleSubtask, deleteSubtask, subtaskRefreshKey, setSubtaskRefreshKey }} />
                   ))}
                 </div>
@@ -624,6 +628,13 @@ function App() {
               </div>
             </div>
           </>
+        )}
+
+        {view === "taskDetail" && selectedTask && (
+          <TaskDetailPage
+            task={selectedTask}
+            onBack={() => { setView("tasks"); setSelectedTask(null); }}
+          />
         )}
 
         {view === "import" && (
@@ -755,7 +766,7 @@ function App() {
   );
 }
 
-function TaskCard({ task, typeName, color, done, onToggle, onEdit, onDelete, onExpand, expanded, subtaskProps }) {
+function TaskCard({ task, typeName, color, done, onToggle, onEdit, onDelete, onExpand, onOpenDetail, expanded, subtaskProps }) {
   const cd = formatCountdown(task);
   const priorityLabel = { high: "高", medium: "中", low: "低" }[task.priority || "medium"];
   const priorityColor = { high: "#ef4444", medium: "#f59e0b", low: "#10b981" }[task.priority || "medium"];
@@ -778,7 +789,7 @@ function TaskCard({ task, typeName, color, done, onToggle, onEdit, onDelete, onE
           </button>
         </div>
       </div>
-      <h4 className="task-title">{task.title}</h4>
+      <h4 className="task-title" style={{ cursor: 'pointer' }} onClick={onOpenDetail} title="点击查看详情">{task.title}</h4>
       <div className="task-meta">
         {task.startDate && <span>开始: {fmtDate(task.startDate)}</span>}
         {task.endDate && <span>截止: {fmtDate(task.endDate)}</span>}
