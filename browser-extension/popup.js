@@ -124,11 +124,12 @@
       var encoded = encodeURIComponent(JSON.stringify(extractedData));
       var targetUrl = SCHEDULE_APP_URL + "#import=" + encoded;
 
-      // Find existing schedule-app tab
+      // Find existing schedule-app tab (dev or production)
       var allTabs = await chrome.tabs.query({});
       var existingTab = null;
       for (var j = 0; j < allTabs.length; j++) {
-        if (allTabs[j].url && allTabs[j].url.indexOf("localhost:5173") !== -1) {
+        var url = allTabs[j].url || '';
+        if (url.indexOf("localhost:5173") !== -1 || url.indexOf("imauser.pages.dev") !== -1) {
           existingTab = allTabs[j];
           break;
         }
