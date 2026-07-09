@@ -10,15 +10,11 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.0",
-    "dexie": "latest",
-    "echarts": "latest",
-    "echarts-for-react": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "react-router-dom": "latest"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "latest",
-    "vite": "latest"
+    "@vitejs/plugin-react": "^6.0.2",
+    "vite": "^8.0.16"
   }
 }
