@@ -13,4 +13,23 @@ CREATE TABLE IF NOT EXISTS blocks (
 CREATE INDEX IF NOT EXISTS idx_blocks_task ON blocks(task_id, "order");
 
 ALTER TABLE blocks ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all" ON blocks FOR ALL USING (true) WITH CHECK (true);
+
+-- 移除旧的全开放策略（如果存在）
+DROP POLICY IF EXISTS "Allow all" ON blocks;
+
+-- 仅允许访问属于自己任务的 block
+CREATE POLICY "Users own blocks" ON blocks
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM tasks
+      WHERE tasks.id = blocks.task_id
+        AND tasks.user_id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM tasks
+      WHERE tasks.id = blocks.task_id
+        AND tasks.user_id = auth.uid()
+    )
+  );
