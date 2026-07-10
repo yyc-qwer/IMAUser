@@ -181,6 +181,9 @@ function App() {
   const [filterPriority, setFilterPriority] = useState("");
   const [expandedTask, setExpandedTask] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
+  const [theme, setTheme] = useState(() => localStorage.getItem('ima_theme') || 'light');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsRef = useRef(null);
 
   const [form, setForm] = useState({
     title: "", typeId: "", startDate: "", endDate: "", notes: "",
@@ -226,6 +229,26 @@ function App() {
     const id = setInterval(checkDeadlines, 5 * 60 * 1000); // 每5分钟
     return () => clearInterval(id);
   }, [notifEnabled, activeTasks]);
+
+  // Apply theme to document root
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('ima_theme', theme);
+  }, [theme]);
+
+  // Close settings dropdown on outside click
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const handler = (e) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target)) {
+        setSettingsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [settingsOpen]);
+
+  const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
 
   const openNew = () => {
     setEditingTask(null);
@@ -534,11 +557,33 @@ function App() {
           <div className="stat"><span className="stat-val">{completedTasks.length}</span><span className="stat-label">已完成</span></div>
         </div>
 
-        <div className="sidebar-section">
-          <div className="user-info">
-            <span className="user-email" title={user.email}>{user.email}</span>
-            <button className="btn-secondary logout-btn" onClick={signOut}>退出登录</button>
+        <div className="settings-wrapper" ref={settingsRef}>
+          <div className={`settings-dropdown ${settingsOpen ? 'open' : ''}`}>
+            <div className="settings-dropdown-header">
+              <div className="settings-dropdown-email" title={user.email}>{user.email}</div>
+            </div>
+            <div className="settings-item" onClick={toggleTheme}>
+              <span className="settings-item-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  {theme === 'light'
+                    ? <><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></>
+                    : <><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></>
+                  }
+                </svg>
+                {theme === 'light' ? '浅色模式' : '深色模式'}
+              </span>
+              <div className="theme-switch" />
+            </div>
+            <div className="settings-divider" />
+            <div className="settings-logout" onClick={() => { setSettingsOpen(false); signOut(); }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              退出登录
+            </div>
           </div>
+          <button className="settings-btn" onClick={() => setSettingsOpen(o => !o)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span className="nav-label">设置</span>
+          </button>
         </div>
         </div>
       </aside>

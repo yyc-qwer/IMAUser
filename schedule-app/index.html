@@ -7,8 +7,15 @@
     <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
     <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700,800&display=swap" rel="stylesheet" />
     <style>
-      html { background: #f9f6f0; }
+      html { background: #fcfaf7; }
+      html[data-theme="dark"] { background: #171512; }
     </style>
+    <script>
+      (function() {
+        var t = localStorage.getItem('ima_theme') || 'light';
+        document.documentElement.setAttribute('data-theme', t);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
