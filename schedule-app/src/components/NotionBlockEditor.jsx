@@ -212,27 +212,18 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     const touch = e.touches[0];
     setTouchDrag(prev => ({ ...prev, y: touch.clientY }));
 
-    // Calculate target visible index based on finger position
+    // Calculate toVisibleIdx: 0..n (insert position in visibleBlocks)
+    // Walk through blocks top-to-bottom, find first block whose midpoint is below touch
     const wrappers = editorRef.current?.querySelectorAll('.notion-block-wrapper');
     if (!wrappers) return;
-    let target = touchDrag.fromVisibleIdx;
+    let target = wrappers.length; // default: insert at end
     for (let i = 0; i < wrappers.length; i++) {
       const rect = wrappers[i].getBoundingClientRect();
       const midY = rect.top + rect.height / 2;
-      if (touch.clientY > midY && i > target) target = i;
-      if (touch.clientY < midY && i < target) target = i;
+      if (touch.clientY < midY) { target = i; break; }
     }
-    // Fine-tune: find nearest center
-    let nearest = target;
-    let nearestDist = Infinity;
-    for (let i = 0; i < wrappers.length; i++) {
-      const rect = wrappers[i].getBoundingClientRect();
-      const midY = rect.top + rect.height / 2;
-      const dist = Math.abs(touch.clientY - midY);
-      if (dist < nearestDist) { nearestDist = dist; nearest = i; }
-    }
-    if (nearest !== touchDrag.toVisibleIdx) {
-      setTouchDrag(prev => ({ ...prev, toVisibleIdx: nearest }));
+    if (target !== touchDrag.toVisibleIdx) {
+      setTouchDrag(prev => ({ ...prev, toVisibleIdx: target }));
     }
   };
 
@@ -241,21 +232,27 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     longPressTimer.current = null;
 
     if (!touchDrag) return;
-    const { fromVisibleIdx, toVisibleIdx } = touchDrag;
+    const { id, fromVisibleIdx, toVisibleIdx } = touchDrag;
 
     if (fromVisibleIdx !== toVisibleIdx) {
       const fromV = visibleBlocks[fromVisibleIdx];
-      const toV = visibleBlocks[toVisibleIdx];
-      if (fromV && toV) {
-        const newBlocks = [...blocks];
-        const [removed] = newBlocks.splice(fromV.originalIdx, 1);
-        // Adjust target after removal
-        const adjustedTarget = fromV.originalIdx < toV.originalIdx ? toV.originalIdx - 1 : toV.originalIdx;
-        newBlocks.splice(adjustedTarget, 0, removed);
-        const reordered = newBlocks.map((b, i) => ({ ...b, order: i }));
-        setBlocks(reordered);
-        saveOrder(reordered);
+      if (!fromV) { setTouchDrag(null); return; }
+
+      const newBlocks = [...blocks];
+      const [removed] = newBlocks.splice(fromV.originalIdx, 1);
+
+      // toVisibleIdx is the target index in visibleBlocks (0..n)
+      let insertIdx;
+      if (toVisibleIdx >= visibleBlocks.length) {
+        insertIdx = newBlocks.length; // end
+      } else {
+        const targetV = visibleBlocks[toVisibleIdx];
+        insertIdx = newBlocks.findIndex(b => b.id === targetV.block.id);
       }
+      newBlocks.splice(insertIdx, 0, removed);
+      const reordered = newBlocks.map((b, i) => ({ ...b, order: i }));
+      setBlocks(reordered);
+      saveOrder(reordered);
     }
     setTouchDrag(null);
     touchStartPos.current = null;
@@ -391,14 +388,17 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
       {visibleBlocks.map((vb, vi) => {
         const b = vb.block;
         const isBeingDragged = touchDrag && touchDrag.id === b.id;
-        const showInsertMarker = touchDrag && touchDrag.toVisibleIdx === vi && touchDrag.fromVisibleIdx !== vi;
+        // toVisibleIdx=vi means insert BEFORE this block
+        const showMarkerAbove = touchDrag && touchDrag.toVisibleIdx === vi && touchDrag.fromVisibleIdx !== vi;
+        // toVisibleIdx=visibleBlocks.length means insert AFTER last block
+        const isLast = vi === visibleBlocks.length - 1;
+        const showMarkerBelow = touchDrag && touchDrag.toVisibleIdx === visibleBlocks.length &&
+          isLast && touchDrag.fromVisibleIdx !== visibleBlocks.length;
 
         return (
           <div key={b.id} className="notion-block-wrapper" style={{ position: 'relative' }}>
-            {/* Insert marker before this block */}
-            {showInsertMarker && touchDrag.fromVisibleIdx > vi && (
-              <div className="touch-drop-indicator" />
-            )}
+            {/* Insert marker above this block */}
+            {showMarkerAbove && <div className="touch-drop-indicator" />}
 
             <div
               className={`notion-block ${b.type}${isMobile ? ' mobile' : ''}${dragId === b.id ? ' dragging' : ''}${dragOverId === b.id ? ' drag-over' : ''}${isBeingDragged ? ' touch-dragging-block' : ''}`}
@@ -437,10 +437,8 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
               )}
             </div>
 
-            {/* Insert marker after this block */}
-            {showInsertMarker && touchDrag.fromVisibleIdx < vi && (
-              <div className="touch-drop-indicator" />
-            )}
+            {/* Insert marker below last block */}
+            {showMarkerBelow && <div className="touch-drop-indicator" />}
 
             {/* Mobile: per-block dropdown menu */}
             {isMobile && activeBlockMenu === b.id && (
@@ -459,11 +457,6 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
           </div>
         );
       })}
-
-      {/* Insert marker at very end */}
-      {touchDrag && touchDrag.toVisibleIdx >= visibleBlocks.length && (
-        <div className="touch-drop-indicator" />
-      )}
 
       {/* Mobile: bottom add button */}
       {isMobile && blocks.length > 0 && (
