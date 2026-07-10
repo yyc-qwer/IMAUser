@@ -4,23 +4,51 @@ import { useBlocks } from '../hooks/useBlocks';
 export default function NotionBlockEditor({ taskId, isMobile }) {
   const { getBlocks, addBlock, updateBlock, deleteBlock, reorderBlocks } = useBlocks();
   const [blocks, setBlocks] = useState([]);
-  const [dragId, setDragId] = useState(null);
-  const [dragOverId, setDragOverId] = useState(null);
   const [hoverId, setHoverId] = useState(null);
   const [focusId, setFocusId] = useState(null);
   const [convertMenu, setConvertMenu] = useState(null);
   const [activeBlockMenu, setActiveBlockMenu] = useState(null);
 
-  // -- Touch drag state (mobile) --
-  const [touchDrag, setTouchDrag] = useState(null); // { id, originalIdx, fromVisibleIdx, toVisibleIdx, y, startY }
+  // -- Desktop drag --
+  const [dragId, setDragId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
+  const dragGroupRef = useRef(null); // { fromIdx, toIdx } range of children when dragging a toggle
+
+  // -- Touch drag (mobile) --
+  const [touchDrag, setTouchDrag] = useState(null);
   const longPressTimer = useRef(null);
   const touchStartPos = useRef(null);
   const editorRef = useRef(null);
   const loadedRef = useRef(false);
 
-  // -- Collapsed toggle: compute visible blocks --
-  // A collapsed toggle hides blocks with indent STRICTLY greater than it.
-  // This is Notion's standard behavior — children must be indented (Tab) to be hidden.
+  // -- Helper: find parent toggle of a block --
+  const findParentToggle = useCallback((idx) => {
+    if (idx <= 0 || idx >= blocks.length) return null;
+    const currentIndent = blocks[idx]?.indent || 0;
+    if (currentIndent <= 0) return null;
+    for (let i = idx - 1; i >= 0; i--) {
+      if ((blocks[i].indent || 0) < currentIndent) {
+        return blocks[i].type === 'toggle' ? { block: blocks[i], idx: i } : null;
+      }
+    }
+    return null;
+  }, [blocks]);
+
+  // -- Helper: get child range for a toggle (all consecutive blocks with indent > toggle.indent) --
+  const getChildRange = useCallback((toggleIdx) => {
+    const toggle = blocks[toggleIdx];
+    if (!toggle || toggle.type !== 'toggle') return null;
+    const minIndent = toggle.indent || 0;
+    let end = toggleIdx;
+    for (let i = toggleIdx + 1; i < blocks.length; i++) {
+      if ((blocks[i].indent || 0) > minIndent) end = i;
+      else break;
+    }
+    if (end === toggleIdx) return null; // no children
+    return { start: toggleIdx + 1, end };
+  }, [blocks]);
+
+  // -- Collapsed toggle: visible blocks --
   const visibleBlocks = useMemo(() => {
     const result = [];
     let skipUntilIndent = Infinity;
@@ -59,29 +87,43 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
 
   // -- Persist order --
   const saveOrder = async (newBlocks) => {
-    const ids = newBlocks.map(b => b.id);
-    await reorderBlocks(ids);
+    await reorderBlocks(newBlocks.map(b => b.id));
   };
 
-  // -- Inherit type from parent block --
-  // toggle is a CONTAINER — children are text, not new toggles
+  // -- Inherit type --
   const getInheritedType = (parentBlock) => {
     if (!parentBlock) return 'text';
-    // list types inherit, toggle does NOT (children should be regular text)
     if (['bulleted_list', 'numbered_list', 'todo'].includes(parentBlock.type)) return parentBlock.type;
     return 'text';
   };
 
-  // -- Add block (inherits type) --
-  const handleAdd = async (afterVisibleIdx, forceType) => {
+  // -- Add block --
+  const handleAdd = async (afterVisibleIdx, _forceType) => {
     const v = visibleBlocks[afterVisibleIdx];
     const parentBlock = v ? v.block : null;
     const afterOriginalIdx = v ? v.originalIdx : (blocks.length > 0 ? blocks.length - 1 : -1);
 
-    const type = forceType || getInheritedType(parentBlock);
-    const indent = parentBlock?.indent || 0;
-    const insertIdx = afterOriginalIdx + 1;
+    // If parent is a toggle, child inherits indent+1 (type=text)
+    let type, indent;
+    if (parentBlock?.type === 'toggle') {
+      type = 'text';
+      indent = (parentBlock.indent || 0) + 1;
+    } else if (parentBlock && (parentBlock.indent || 0) > 0) {
+      // Check if parent block is itself a child of a toggle
+      const parentToggle = findParentToggle(afterOriginalIdx);
+      if (parentToggle) {
+        type = 'text';
+        indent = parentBlock.indent || 0;
+      } else {
+        type = getInheritedType(parentBlock);
+        indent = parentBlock.indent || 0;
+      }
+    } else {
+      type = getInheritedType(parentBlock);
+      indent = parentBlock?.indent || 0;
+    }
 
+    const insertIdx = afterOriginalIdx + 1;
     const b = await addBlock(taskId, type, '', insertIdx, indent);
     if (!b) return;
 
@@ -130,8 +172,30 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
 
   // -- Type change --
   const handleTypeChange = async (id, newType) => {
-    setBlocks(prev => prev.map(b => b.id === id ? { ...b, type: newType } : b));
+    const idx = blocks.findIndex(b => b.id === id);
+    const b = blocks[idx];
+    if (!b) return;
+
+    setBlocks(prev => prev.map(x => x.id === id ? { ...x, type: newType } : x));
     await updateBlock(id, { type: newType });
+
+    // If converting to toggle, auto-create one indent+1 empty child
+    if (newType === 'toggle') {
+      const childIndent = (b.indent || 0) + 1;
+      const child = await addBlock(taskId, 'text', '', idx + 1, childIndent);
+      if (child) {
+        setBlocks(prev => {
+          const newBlocks = [...prev];
+          const cIdx = newBlocks.findIndex(x => x.id === id) + 1;
+          newBlocks.splice(cIdx, 0, child);
+          return newBlocks.map((blk, i) => ({ ...blk, order: i }));
+        });
+        await saveOrder(
+          [...blocks.slice(0, idx + 1), child, ...blocks.slice(idx + 1)].map((blk, i) => ({ ...blk, order: i }))
+        );
+      }
+    }
+
     setConvertMenu(null);
     setActiveBlockMenu(null);
   };
@@ -145,11 +209,29 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     await updateBlock(id, { indent: newIndent });
   };
 
-  // -- Desktop drag --
+  // -- Desktop drag (with toggle group support) --
   const handleDragStart = (e, id) => {
+    const idx = blocks.findIndex(b => b.id === id);
+    const b = blocks[idx];
+    if (!b) return;
+
+    // If dragging a toggle, collapse its children for the drag duration
+    if (b.type === 'toggle') {
+      const range = getChildRange(idx);
+      if (range) {
+        dragGroupRef.current = range;
+        // Collapse children
+        setBlocks(prev => prev.map(x => {
+          if (x.id === id) return { ...x, meta: { ...(x.meta || {}), collapsed: true } };
+          return x;
+        }));
+      }
+    }
+
     setDragId(id);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', id);
+    // Invisible drag ghost
     const ghost = document.createElement('div');
     ghost.style.cssText = 'opacity:0;position:absolute;top:-2000px;left:-2000px;width:1px;height:1px';
     document.body.appendChild(ghost);
@@ -165,17 +247,53 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
   const handleDrop = async (e, targetId) => {
     e.preventDefault();
     setDragOverId(null);
-    if (!dragId || dragId === targetId) { setDragId(null); return; }
+    if (!dragId || dragId === targetId) { finishDrag(); return; }
+
     const from = blocks.findIndex(b => b.id === dragId);
-    const to = blocks.findIndex(b => b.id === targetId);
-    if (from === -1 || to === -1) { setDragId(null); return; }
+    let to = blocks.findIndex(b => b.id === targetId);
+    if (from === -1 || to === -1) { finishDrag(); return; }
+
+    // Unc collapse toggle for the move operation
+    const wasCollapsed = blocks.find(b => b.id === dragId)?.meta?.collapsed || false;
+    if (wasCollapsed) {
+      setBlocks(prev => prev.map(x => {
+        if (x.id === dragId) return { ...x, meta: { ...(x.meta || {}), collapsed: false } };
+        return x;
+      }));
+    }
+
     const newBlocks = [...blocks];
-    const [removed] = newBlocks.splice(from, 1);
-    newBlocks.splice(to, 0, removed);
+
+    // If dragging a toggle with children, move the entire range
+    const range = dragGroupRef.current;
+    if (range) {
+      const groupSize = range.end - range.start + 2; // toggle + children
+      const group = newBlocks.splice(from, groupSize);
+      // Adjust target if it's after the removed group
+      if (to > from) to -= groupSize;
+      newBlocks.splice(to, 0, ...group);
+    } else {
+      const [removed] = newBlocks.splice(from, 1);
+      if (to > from) to -= 1;
+      newBlocks.splice(to, 0, removed);
+    }
+
     const reordered = newBlocks.map((b, i) => ({ ...b, order: i }));
     setBlocks(reordered);
-    setDragId(null);
     await saveOrder(reordered);
+    finishDrag();
+  };
+
+  const finishDrag = () => {
+    // Uncollapse toggle that was collapsed for drag
+    if (dragGroupRef.current && dragId) {
+      setBlocks(prev => prev.map(x => {
+        if (x.id === dragId) return { ...x, meta: { ...(x.meta || {}), collapsed: false } };
+        return x;
+      }));
+    }
+    setDragId(null);
+    dragGroupRef.current = null;
   };
 
   // -- Mobile touch drag --
@@ -187,6 +305,20 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     longPressTimer.current = setTimeout(() => {
       const vb = visibleBlocks[visibleIdx];
       if (!vb) return;
+
+      // If dragging a toggle, collapse children
+      if (vb.block.type === 'toggle') {
+        const idx = vb.originalIdx;
+        const range = getChildRange(idx);
+        if (range) {
+          dragGroupRef.current = range;
+          setBlocks(prev => prev.map(x => {
+            if (x.id === vb.block.id) return { ...x, meta: { ...(x.meta || {}), collapsed: true } };
+            return x;
+          }));
+        }
+      }
+
       setTouchDrag({
         id: vb.block.id,
         originalIdx: vb.originalIdx,
@@ -200,7 +332,6 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
 
   const handleTouchMove = (e) => {
     if (!isMobile) return;
-    // Cancel long-press if finger moves too much
     if (longPressTimer.current && touchStartPos.current) {
       const t = e.touches[0];
       if (Math.abs(t.clientX - touchStartPos.current.x) > 6 || Math.abs(t.clientY - touchStartPos.current.y) > 6) {
@@ -215,11 +346,9 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     const touch = e.touches[0];
     setTouchDrag(prev => ({ ...prev, y: touch.clientY }));
 
-    // Calculate toVisibleIdx: 0..n (insert position in visibleBlocks)
-    // Walk through blocks top-to-bottom, find first block whose midpoint is below touch
     const wrappers = editorRef.current?.querySelectorAll('.notion-block-wrapper');
     if (!wrappers) return;
-    let target = wrappers.length; // default: insert at end
+    let target = wrappers.length;
     for (let i = 0; i < wrappers.length; i++) {
       const rect = wrappers[i].getBoundingClientRect();
       const midY = rect.top + rect.height / 2;
@@ -237,27 +366,52 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     if (!touchDrag) return;
     const { id, fromVisibleIdx, toVisibleIdx } = touchDrag;
 
+    // Uncollapse toggle
+    if (dragGroupRef.current && id) {
+      setBlocks(prev => prev.map(x => {
+        if (x.id === id) return { ...x, meta: { ...(x.meta || {}), collapsed: false } };
+        return x;
+      }));
+    }
+
     if (fromVisibleIdx !== toVisibleIdx) {
       const fromV = visibleBlocks[fromVisibleIdx];
-      if (!fromV) { setTouchDrag(null); return; }
+      if (!fromV) { setTouchDrag(null); dragGroupRef.current = null; touchStartPos.current = null; return; }
 
       const newBlocks = [...blocks];
-      const [removed] = newBlocks.splice(fromV.originalIdx, 1);
+      const range = dragGroupRef.current;
 
-      // toVisibleIdx is the target index in visibleBlocks (0..n)
-      let insertIdx;
-      if (toVisibleIdx >= visibleBlocks.length) {
-        insertIdx = newBlocks.length; // end
+      if (range) {
+        // Move toggle + children as a group
+        const groupSize = range.end - range.start + 2;
+        const group = newBlocks.splice(fromV.originalIdx, groupSize);
+        let insertIdx;
+        if (toVisibleIdx >= visibleBlocks.length) {
+          insertIdx = newBlocks.length;
+        } else {
+          const targetV = visibleBlocks[toVisibleIdx];
+          insertIdx = newBlocks.findIndex(b => b.id === targetV.block.id);
+        }
+        newBlocks.splice(insertIdx, 0, ...group);
       } else {
-        const targetV = visibleBlocks[toVisibleIdx];
-        insertIdx = newBlocks.findIndex(b => b.id === targetV.block.id);
+        const [removed] = newBlocks.splice(fromV.originalIdx, 1);
+        let insertIdx;
+        if (toVisibleIdx >= visibleBlocks.length) {
+          insertIdx = newBlocks.length;
+        } else {
+          const targetV = visibleBlocks[toVisibleIdx];
+          insertIdx = newBlocks.findIndex(b => b.id === targetV.block.id);
+        }
+        newBlocks.splice(insertIdx, 0, removed);
       }
-      newBlocks.splice(insertIdx, 0, removed);
+
       const reordered = newBlocks.map((b, i) => ({ ...b, order: i }));
       setBlocks(reordered);
       saveOrder(reordered);
     }
+
     setTouchDrag(null);
+    dragGroupRef.current = null;
     touchStartPos.current = null;
   };
 
@@ -269,13 +423,11 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
 
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      const vi = visibleBlocks.findIndex(v => v.block.id === id);
-      if (vi < 0) return;
 
-      // toggle → child block (indented +1, type text)
+      // toggle → create indent+1 child
       if (b.type === 'toggle') {
-        const insertIdx = idx + 1;
         const childIndent = (b.indent || 0) + 1;
+        const insertIdx = idx + 1;
         const newBlock = await addBlock(taskId, 'text', '', insertIdx, childIndent);
         if (!newBlock) return;
         const newBlocks = [...blocks];
@@ -287,8 +439,24 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
         return;
       }
 
-      // list types: inherit type at same indent
-      handleAdd(vi, getInheritedType(b));
+      // Child of a toggle → create sibling at same indent
+      const parentInfo = findParentToggle(idx);
+      if (parentInfo) {
+        const insertIdx = idx + 1;
+        const newBlock = await addBlock(taskId, 'text', '', insertIdx, b.indent || 0);
+        if (!newBlock) return;
+        const newBlocks = [...blocks];
+        newBlocks.splice(insertIdx, 0, newBlock);
+        const reordered = newBlocks.map((blk, i) => ({ ...blk, order: i }));
+        setBlocks(reordered);
+        await saveOrder(reordered);
+        setFocusId(newBlock.id);
+        return;
+      }
+
+      // List types: inherit
+      const vi = visibleBlocks.findIndex(v => v.block.id === id);
+      if (vi >= 0) handleAdd(vi);
     }
 
     if (e.key === 'Backspace' && b.content === '' && blocks.length > 1) {
@@ -316,6 +484,17 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     }
   }, [focusId]);
 
+  // -- Click on editor (not on menus) closes menus --
+  const handleEditorClick = (e) => {
+    // Don't close menus if clicking on a menu item or menu toggle button
+    const target = e.target;
+    if (target.closest('.convert-menu') || target.closest('.mobile-sheet') ||
+        target.closest('.block-mobile-menu') || target.closest('.mobile-sheet-overlay') ||
+        target.closest('.block-actions')) return;
+    setConvertMenu(null);
+    setActiveBlockMenu(null);
+  };
+
   // -- Click outside closes menus --
   useEffect(() => {
     const click = (e) => {
@@ -324,8 +503,8 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
         setActiveBlockMenu(null);
       }
     };
-    document.addEventListener('click', click);
-    return () => document.removeEventListener('click', click);
+    document.addEventListener('pointerdown', click);
+    return () => document.removeEventListener('pointerdown', click);
   }, []);
 
   // -- Prevent scroll during touch drag --
@@ -406,22 +585,20 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     <div
       className={`notion-editor${isMobile ? ' mobile' : ''}${touchDrag ? ' touch-dragging' : ''}`}
       ref={editorRef}
+      onClick={handleEditorClick}
       onTouchMove={isMobile ? handleTouchMove : undefined}
       onTouchEnd={isMobile ? handleTouchEnd : undefined}
     >
       {visibleBlocks.map((vb, vi) => {
         const b = vb.block;
         const isBeingDragged = touchDrag && touchDrag.id === b.id;
-        // toVisibleIdx=vi means insert BEFORE this block
         const showMarkerAbove = touchDrag && touchDrag.toVisibleIdx === vi && touchDrag.fromVisibleIdx !== vi;
-        // toVisibleIdx=visibleBlocks.length means insert AFTER last block
         const isLast = vi === visibleBlocks.length - 1;
         const showMarkerBelow = touchDrag && touchDrag.toVisibleIdx === visibleBlocks.length &&
           isLast && touchDrag.fromVisibleIdx !== visibleBlocks.length;
 
         return (
           <div key={b.id} className="notion-block-wrapper" style={{ position: 'relative' }}>
-            {/* Insert marker above this block */}
             {showMarkerAbove && <div className="touch-drop-indicator" />}
 
             <div
@@ -431,7 +608,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
               onDragStart={!isMobile ? e => handleDragStart(e, b.id) : undefined}
               onDragOver={!isMobile ? e => handleDragOver(e, b.id) : undefined}
               onDrop={!isMobile ? e => handleDrop(e, b.id) : undefined}
-              onDragEnd={!isMobile ? () => { setDragId(null); setDragOverId(null); } : undefined}
+              onDragEnd={!isMobile ? finishDrag : undefined}
               onMouseEnter={!isMobile ? () => setHoverId(b.id) : undefined}
               onMouseLeave={!isMobile ? () => setHoverId(null) : undefined}
               onTouchStart={isMobile ? (e) => handleTouchStart(e, vi) : undefined}
@@ -440,8 +617,8 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
               {/* Desktop: left-side buttons */}
               {!isMobile && (
                 <div className={`block-actions${hoverId === b.id ? ' visible' : ''}`}>
-                  <button className="block-add" onClick={e => { e.stopPropagation(); handleAdd(vi); }}>+</button>
-                  <button className="block-handle" onClick={e => {
+                  <button className="block-add" onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); handleAdd(vi); }}>+</button>
+                  <button className="block-handle" onMouseDown={e => e.stopPropagation()} onClick={e => {
                     e.stopPropagation();
                     const rect = e.currentTarget.getBoundingClientRect();
                     setConvertMenu({ x: Math.min(rect.left, window.innerWidth - 200), y: rect.bottom + 4, blockId: b.id });
@@ -461,19 +638,21 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
               )}
             </div>
 
-            {/* Insert marker below last block */}
             {showMarkerBelow && <div className="touch-drop-indicator" />}
 
             {/* Mobile: per-block dropdown menu */}
             {isMobile && activeBlockMenu === b.id && (
               <div className="block-mobile-menu">
                 <button onClick={() => { handleAdd(vi); setActiveBlockMenu(null); }}>+ 在下方添加</button>
-                <button onClick={e => { e.stopPropagation(); setConvertMenu({ blockId: b.id, mobile: true }); }}>⇄ 转换类型</button>
+                <button onClick={e => { e.stopPropagation(); setConvertMenu({ blockId: b.id, mobile: true }); }}>
+                  ⇄ 转换类型
+                </button>
                 <button onClick={() => handleToggleCollapse(b.id)} disabled={b.type !== 'toggle'}>
                   {b.meta?.collapsed ? '▶ 展开' : '▼ 折叠'}
                 </button>
-                <button onClick={() => handleIndent(b.id, 1)}>→ 增加缩进</button>
-                <button onClick={() => handleIndent(b.id, -1)} disabled={(b.indent || 0) === 0}>← 减少缩进</button>
+                <button onClick={() => { handleIndent(b.id, 1); setActiveBlockMenu(null); }}>→ 增加缩进</button>
+                <button onClick={() => { handleIndent(b.id, -1); setActiveBlockMenu(null); }}
+                  disabled={(b.indent || 0) === 0}>← 减少缩进</button>
                 <button onClick={() => { handleDelete(b.id); setActiveBlockMenu(null); }}
                   style={{ color: 'var(--danger)' }} disabled={blocks.length <= 1}>✕ 删除</button>
               </div>
