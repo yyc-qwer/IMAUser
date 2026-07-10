@@ -1,6 +1,6 @@
 import NotionBlockEditor from "./NotionBlockEditor";
 
-export default function TaskDetailPage({ task, onBack }) {
+export default function TaskDetailPage({ task, isMobile, onBack }) {
   const priorityLabel = { high: "高", medium: "中", low: "低" }[task.priority || "medium"];
   const priorityColor = { high: "#ef4444", medium: "#f59e0b", low: "#10b981" }[task.priority || "medium"];
 
@@ -19,7 +19,7 @@ export default function TaskDetailPage({ task, onBack }) {
       <div className="task-detail-title">{task.title}</div>
 
       <div className="task-detail-editor">
-        <NotionBlockEditor taskId={task.id} />
+        <NotionBlockEditor taskId={task.id} isMobile={isMobile} />
       </div>
     </div>
   );

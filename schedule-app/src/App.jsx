@@ -732,6 +732,7 @@ function App() {
         {view === "taskDetail" && selectedTask && (
           <TaskDetailPage
             task={selectedTask}
+            isMobile={isMobile}
             onBack={() => { setView("tasks"); setSelectedTask(null); }}
           />
         )}

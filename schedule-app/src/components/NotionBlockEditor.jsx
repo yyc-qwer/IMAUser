@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useBlocks } from '../hooks/useBlocks';
 
-export default function NotionBlockEditor({ taskId }) {
+export default function NotionBlockEditor({ taskId, isMobile }) {
   const { getBlocks, addBlock, updateBlock, deleteBlock, reorderBlocks } = useBlocks();
   const [blocks, setBlocks] = useState([]);
   const [dragId, setDragId] = useState(null);
@@ -221,26 +221,26 @@ export default function NotionBlockEditor({ taskId }) {
       {blocks.map((b, i) => (
         <div
           key={b.id}
-          className={`notion-block ${b.type} ${dragId === b.id ? 'dragging' : ''} ${dragOverId === b.id ? 'drag-over' : ''}`}
-          style={{ paddingLeft: `${(b.indent || 0) * 24 + 40}px` }}
-          draggable
-          onDragStart={e => handleDragStart(e, b.id)}
-          onDragOver={e => handleDragOver(e, b.id)}
-          onDrop={e => handleDrop(e, b.id)}
-          onDragEnd={() => { setDragId(null); setDragOverId(null); }}
-          onMouseEnter={() => setHoverId(b.id)}
-          onMouseLeave={() => setHoverId(null)}
+          className={`notion-block ${b.type} ${isMobile ? 'mobile' : ''} ${dragId === b.id ? 'dragging' : ''} ${dragOverId === b.id ? 'drag-over' : ''}`}
+          style={{ paddingLeft: `${(b.indent || 0) * 24 + (isMobile ? 48 : 40)}px` }}
+          draggable={!isMobile}
+          onDragStart={isMobile ? undefined : e => handleDragStart(e, b.id)}
+          onDragOver={isMobile ? undefined : e => handleDragOver(e, b.id)}
+          onDrop={isMobile ? undefined : e => handleDrop(e, b.id)}
+          onDragEnd={isMobile ? undefined : () => { setDragId(null); setDragOverId(null); }}
+          onMouseEnter={isMobile ? undefined : () => setHoverId(b.id)}
+          onMouseLeave={isMobile ? undefined : () => setHoverId(null)}
           data-block-id={b.id}
         >
-          <div className={`block-actions ${hoverId === b.id ? 'visible' : ''}`}>
+          <div className={`block-actions ${isMobile || hoverId === b.id ? 'visible' : ''}`}>
             <button className="block-add" title="下方添加" onClick={(e) => { e.stopPropagation(); handleAdd(i); }}>+</button>
             <button
               className="block-handle"
-              title="拖拽排序 / 转换类型"
+              title={isMobile ? "转换类型" : "拖拽排序 / 转换类型"}
               onClick={(e) => {
                 e.stopPropagation();
                 const rect = e.currentTarget.getBoundingClientRect();
-                setConvertMenu({ x: rect.left, y: rect.bottom + 4, blockId: b.id });
+                setConvertMenu({ x: Math.min(rect.left, window.innerWidth - 200), y: rect.bottom + 4, blockId: b.id });
               }}
             >⋮⋮</button>
           </div>

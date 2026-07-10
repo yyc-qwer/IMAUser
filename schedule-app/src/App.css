@@ -579,6 +579,7 @@ button:active { transform: scale(0.98); }
   padding: 4px 0; min-height: 34px;
   position: relative; border-radius: 6px;
   transition: background 0.15s;
+  touch-action: manipulation;
 }
 .notion-block:hover { background: var(--surface2); }
 .notion-block.dragging { opacity: 0.5; }
@@ -601,6 +602,7 @@ button:active { transform: scale(0.98); }
   border: none; background: none; color: var(--text3);
   font-size: 14px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
+  touch-action: manipulation;
 }
 .block-add:hover { background: var(--surface); color: var(--text); }
 
@@ -609,6 +611,7 @@ button:active { transform: scale(0.98); }
   border: none; background: none; color: var(--text3);
   font-size: 10px; cursor: grab;
   display: flex; align-items: center; justify-content: center;
+  touch-action: manipulation;
 }
 .block-handle:hover { background: var(--surface); color: var(--text); }
 .block-handle:active { cursor: grabbing; }
@@ -617,6 +620,8 @@ button:active { transform: scale(0.98); }
   flex: 1; padding: 3px 6px; font-size: 15px;
   background: none; border: none; outline: none;
   color: var(--text); min-height: 26px; line-height: 1.6;
+  -webkit-user-select: text; user-select: text;
+  touch-action: manipulation;
 }
 .block-content::placeholder { color: var(--text3); }
 
@@ -630,6 +635,7 @@ button:active { transform: scale(0.98); }
   color: var(--text3); font-size: 10px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   border-radius: 4px;
+  touch-action: manipulation;
 }
 .toggle-btn-small:hover { background: var(--surface); }
 
@@ -1432,6 +1438,25 @@ button:active { transform: scale(0.98); }
   .task-detail-page { padding: 20px 16px; }
   .task-detail-title { font-size: 28px; }
 
+  /* Block editor mobile */
+  .notion-block { min-height: 44px; padding: 6px 0; }
+  .notion-block.mobile .block-actions { left: 4px; top: 6px; width: auto; gap: 6px; }
+  .notion-block.mobile .block-add,
+  .notion-block.mobile .block-handle {
+    width: 38px; height: 38px; font-size: 16px;
+    border-radius: 10px;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .notion-block.mobile .block-add { font-size: 20px; font-weight: 700; color: var(--primary); }
+  .notion-block.mobile .block-handle { font-size: 14px; }
+  .notion-block.mobile .block-add:active,
+  .notion-block.mobile .block-handle:active { background: var(--primary-light); }
+  .notion-block.mobile .toggle-btn-small { width: 32px; height: 32px; font-size: 14px; }
+  .notion-block.mobile .block-content { font-size: 16px; padding: 8px 6px; min-height: 36px; }
+  .task-detail-editor { overscroll-behavior: contain; }
+
   /* Modal → fullscreen on mobile */
   .modal {
     width: 100%; max-width: 100%;
@@ -1496,6 +1521,9 @@ button:active { transform: scale(0.98); }
 
   .task-detail-title { font-size: 24px; }
   .task-detail-page { padding: 16px 12px; }
+  .task-detail-editor { overscroll-behavior: contain; }
+  .notion-block.mobile .block-add,
+  .notion-block.mobile .block-handle { width: 36px; height: 36px; }
 
   .import-card { padding: 20px 18px; }
   .import-card h3 { font-size: 17px; }
@@ -1540,12 +1568,45 @@ button:active { transform: scale(0.98); }
     min-width: 20px; min-height: 20px;
   }
 
+  /* Block editor: enlarge touch targets */
+  .block-add, .block-handle {
+    min-width: 36px; min-height: 36px;
+    font-size: 16px;
+  }
+  .toggle-btn-small {
+    min-width: 32px; min-height: 32px;
+    font-size: 14px;
+  }
+  .notion-block { min-height: 42px; }
+  .block-content { font-size: 16px; min-height: 36px; padding: 6px 6px; }
+  .block-actions { width: auto; gap: 6px; left: 2px; }
+
+  /* Task detail back button */
+  .task-detail-header .btn-secondary {
+    min-height: 40px; padding: 10px 20px; font-size: 15px;
+  }
+
+  /* Prevent iOS long-press callout on non-input elements */
+  .notion-block {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none; user-select: none;
+  }
+  .notion-block input, .notion-block textarea {
+    -webkit-touch-callout: default;
+    -webkit-user-select: text; user-select: text;
+  }
+
   /* Task card hover transform - disable on touch */
   .task-card:hover {
     transform: none;
   }
   .task-card:active {
     transform: scale(0.99);
+  }
+
+  /* Convert menu bigger on touch */
+  .convert-item {
+    min-height: 48px; padding: 14px 20px; font-size: 15px;
   }
 
   /* Modal closer touch target */
