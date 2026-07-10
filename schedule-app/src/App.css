@@ -651,15 +651,17 @@ button:active { transform: scale(0.98); }
   background: var(--surface);
   border: 1.5px solid var(--border);
   border-radius: 14px; padding: 6px;
-  min-width: 160px; z-index: 100;
+  min-width: 160px; max-width: 220px; z-index: 100;
   box-shadow: var(--shadow-lg);
+  max-height: 280px; overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .block-mobile-menu button {
   display: block; width: 100%;
   text-align: left; background: none; border: none;
   padding: 13px 16px; font-size: 15px; font-weight: 600;
   color: var(--text); cursor: pointer;
-  border-radius: 10px;
+  border-radius: 10px; flex-shrink: 0;
   transition: background 0.12s;
 }
 .block-mobile-menu button:hover,
@@ -807,16 +809,35 @@ button:active { transform: scale(0.98); }
 .convert-menu {
   position: fixed; background: var(--surface);
   border: 1.5px solid var(--border); border-radius: var(--radius-lg);
-  padding: 8px; min-width: 180px;
+  padding: 8px; min-width: 180px; max-width: 220px;
   box-shadow: var(--shadow-lg); z-index: 200;
+  max-height: 320px; overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .convert-item {
   display: flex; align-items: center; gap: 10px;
   padding: 12px 16px; border-radius: 12px;
   cursor: pointer; font-size: 14px; font-weight: 600;
-  transition: background 0.15s;
+  transition: background 0.15s; flex-shrink: 0;
 }
 .convert-item:hover { background: var(--surface2); }
+
+/* Scrollbar for convert menus */
+.convert-menu::-webkit-scrollbar,
+.block-mobile-menu::-webkit-scrollbar,
+.mobile-sheet::-webkit-scrollbar { width: 5px; }
+.convert-menu::-webkit-scrollbar-track,
+.block-mobile-menu::-webkit-scrollbar-track,
+.mobile-sheet::-webkit-scrollbar-track { background: transparent; }
+.convert-menu::-webkit-scrollbar-thumb,
+.block-mobile-menu::-webkit-scrollbar-thumb,
+.mobile-sheet::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 10px;
+}
+.convert-menu::-webkit-scrollbar-thumb:hover,
+.block-mobile-menu::-webkit-scrollbar-thumb:hover,
+.mobile-sheet::-webkit-scrollbar-thumb:hover { background: var(--text3); }
 
 /* =============================================
    Modal
