@@ -20,7 +20,7 @@ function PomodoroTimer() {
   const modes = {
     work: { min: 25, label: '专注', color: '#ef4444' },
     shortBreak: { min: 5, label: '短休息', color: '#10b981' },
-    longBreak: { min: 15, label: '长休息', color: '#3b82f6' },
+    longBreak: { min: 15, label: '长休息', color: '#e07b5a' },
   };
 
   useEffect(() => {
@@ -979,8 +979,8 @@ function AnalyticsView({ tasks, activeTasks, completedTasks, taskTypes, weeklySt
             ))}
           </div>
           <div className="weekly-legend">
-            <span><span className="legend-dot" style={{ background: '#10b981' }} />完成</span>
-            <span><span className="legend-dot" style={{ background: '#3b82f6' }} />新增</span>
+            <span><span className="legend-dot" style={{ background: 'var(--success)' }} />完成</span>
+            <span><span className="legend-dot" style={{ background: 'var(--primary)' }} />新增</span>
           </div>
         </div>
 

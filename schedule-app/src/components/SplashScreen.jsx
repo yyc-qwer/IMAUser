@@ -49,7 +49,7 @@ export default function SplashScreen({ onEnter }) {
 
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(59, 130, 246, ${p.alpha})`;
+        ctx.fillStyle = `rgba(224, 123, 90, ${p.alpha})`;
         ctx.fill();
 
         // 连线（限制每帧最多检查 5 个邻居，减少计算量）
@@ -63,7 +63,7 @@ export default function SplashScreen({ onEnter }) {
             ctx.beginPath();
             ctx.moveTo(p.x, p.y);
             ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = `rgba(59, 130, 246, ${0.06 * (1 - dist / 120)})`;
+            ctx.strokeStyle = `rgba(224, 123, 90, ${0.06 * (1 - dist / 120)})`;
             ctx.lineWidth = 0.5;
             ctx.stroke();
           }
@@ -111,7 +111,7 @@ export default function SplashScreen({ onEnter }) {
       <div className="splash-content">
         {/* Logo 图标 */}
         <div className={`splash-logo ${phase >= 0 ? 'visible' : ''}`}>
-          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="1.5">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#e07b5a" strokeWidth="1.5">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
             <line x1="16" y1="2" x2="16" y2="6" />
             <line x1="8" y1="2" x2="8" y2="6" />
