@@ -103,16 +103,18 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     const parentBlock = v ? v.block : null;
     const afterOriginalIdx = v ? v.originalIdx : (blocks.length > 0 ? blocks.length - 1 : -1);
 
-    // If parent is a toggle, child inherits indent+1 (type=text)
+    // Determine type and indent for new block
     let type, indent;
     if (parentBlock?.type === 'toggle') {
+      // + button after a toggle: create indent+1 text child
       type = 'text';
       indent = (parentBlock.indent || 0) + 1;
     } else if (parentBlock && (parentBlock.indent || 0) > 0) {
-      // Check if parent block is itself a child of a toggle
+      // Parent is indented → check if it's inside a toggle
       const parentToggle = findParentToggle(afterOriginalIdx);
       if (parentToggle) {
-        type = 'text';
+        // Child of toggle: inherit current block's type if it's a list type
+        type = getInheritedType(parentBlock);
         indent = parentBlock.indent || 0;
       } else {
         type = getInheritedType(parentBlock);
@@ -439,11 +441,12 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
         return;
       }
 
-      // Child of a toggle → create sibling at same indent
+      // Child of a toggle → create sibling, inherit current block type
       const parentInfo = findParentToggle(idx);
       if (parentInfo) {
+        const siblingType = getInheritedType(b);
         const insertIdx = idx + 1;
-        const newBlock = await addBlock(taskId, 'text', '', insertIdx, b.indent || 0);
+        const newBlock = await addBlock(taskId, siblingType, '', insertIdx, b.indent || 0);
         if (!newBlock) return;
         const newBlocks = [...blocks];
         newBlocks.splice(insertIdx, 0, newBlock);
