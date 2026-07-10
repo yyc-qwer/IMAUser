@@ -62,10 +62,11 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
   };
 
   // -- Inherit type from parent block --
+  // toggle is a CONTAINER — children are text, not new toggles
   const getInheritedType = (parentBlock) => {
     if (!parentBlock) return 'text';
-    const inheritTypes = ['toggle', 'bulleted_list', 'numbered_list', 'todo'];
-    if (inheritTypes.includes(parentBlock.type)) return parentBlock.type;
+    // list types inherit, toggle does NOT (children should be regular text)
+    if (['bulleted_list', 'numbered_list', 'todo'].includes(parentBlock.type)) return parentBlock.type;
     return 'text';
   };
 
@@ -259,18 +260,33 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
   };
 
   // -- Keyboard --
-  const handleKeyDown = (e, id) => {
+  const handleKeyDown = async (e, id) => {
     const idx = blocks.findIndex(b => b.id === id);
     const b = blocks[idx];
     if (!b) return;
 
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      // Find visible index for this block
       const vi = visibleBlocks.findIndex(v => v.block.id === id);
-      if (vi >= 0) {
-        handleAdd(vi, getInheritedType(b));
+      if (vi < 0) return;
+
+      // toggle → child block (indented +1, type text)
+      if (b.type === 'toggle') {
+        const insertIdx = idx + 1;
+        const childIndent = (b.indent || 0) + 1;
+        const newBlock = await addBlock(taskId, 'text', '', insertIdx, childIndent);
+        if (!newBlock) return;
+        const newBlocks = [...blocks];
+        newBlocks.splice(insertIdx, 0, newBlock);
+        const reordered = newBlocks.map((blk, i) => ({ ...blk, order: i }));
+        setBlocks(reordered);
+        await saveOrder(reordered);
+        setFocusId(newBlock.id);
+        return;
       }
+
+      // list types: inherit type at same indent
+      handleAdd(vi, getInheritedType(b));
     }
 
     if (e.key === 'Backspace' && b.content === '' && blocks.length > 1) {
@@ -335,7 +351,11 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
       case 'todo':
         return (
           <div className="block-todo-row">
-            <input type="checkbox" checked={!!b.meta?.checked} onChange={() => handleToggle(b.id)} />
+            <input type="checkbox" checked={!!b.meta?.checked}
+              onMouseDown={e => e.preventDefault()}
+              onChange={e => { e.stopPropagation(); handleToggle(b.id); }}
+              onClick={e => e.stopPropagation()}
+            />
             <input {...commonProps} />
           </div>
         );
@@ -402,7 +422,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
 
             <div
               className={`notion-block ${b.type}${isMobile ? ' mobile' : ''}${dragId === b.id ? ' dragging' : ''}${dragOverId === b.id ? ' drag-over' : ''}${isBeingDragged ? ' touch-dragging-block' : ''}`}
-              style={{ paddingLeft: `${(b.indent || 0) * 24 + (isMobile ? 16 : 52)}px` }}
+              style={{ paddingLeft: `${(b.indent || 0) * 24 + (isMobile ? 16 : 54)}px` }}
               draggable={!isMobile}
               onDragStart={!isMobile ? e => handleDragStart(e, b.id) : undefined}
               onDragOver={!isMobile ? e => handleDragOver(e, b.id) : undefined}
