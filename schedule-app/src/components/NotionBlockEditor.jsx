@@ -19,16 +19,18 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
   const loadedRef = useRef(false);
 
   // -- Collapsed toggle: compute visible blocks --
+  // A collapsed toggle hides blocks with indent STRICTLY greater than it.
+  // This is Notion's standard behavior — children must be indented (Tab) to be hidden.
   const visibleBlocks = useMemo(() => {
     const result = [];
     let skipUntilIndent = Infinity;
     for (let i = 0; i < blocks.length; i++) {
       const b = blocks[i];
-      if (b.indent > skipUntilIndent) continue; // child of collapsed toggle → skip
+      if ((b.indent || 0) > skipUntilIndent) continue;
       skipUntilIndent = Infinity;
       result.push({ block: b, originalIdx: i });
       if (b.type === 'toggle' && b.meta?.collapsed) {
-        skipUntilIndent = b.indent;
+        skipUntilIndent = b.indent || 0;
       }
     }
     return result;
@@ -362,7 +364,9 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
       case 'toggle':
         return (
           <div className="block-toggle-row">
-            <button className="toggle-btn-small" onClick={(e) => { e.stopPropagation(); handleToggleCollapse(b.id); }}>
+            <button className="toggle-btn-small"
+              onMouseDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); e.preventDefault(); handleToggleCollapse(b.id); }}>
               {b.meta?.collapsed ? '▶' : '▼'}
             </button>
             <input {...commonProps} />
@@ -464,7 +468,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
             {isMobile && activeBlockMenu === b.id && (
               <div className="block-mobile-menu">
                 <button onClick={() => { handleAdd(vi); setActiveBlockMenu(null); }}>+ 在下方添加</button>
-                <button onClick={() => { setConvertMenu({ blockId: b.id, mobile: true }); setActiveBlockMenu(null); }}>⇄ 转换类型</button>
+                <button onClick={e => { e.stopPropagation(); setConvertMenu({ blockId: b.id, mobile: true }); }}>⇄ 转换类型</button>
                 <button onClick={() => handleToggleCollapse(b.id)} disabled={b.type !== 'toggle'}>
                   {b.meta?.collapsed ? '▶ 展开' : '▼ 折叠'}
                 </button>
@@ -500,7 +504,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
       {/* Mobile: convert bottom sheet */}
       {convertMenu && convertMenu.mobile && (
         <>
-          <div className="mobile-sheet-overlay" onClick={() => setConvertMenu(null)} />
+          <div className="mobile-sheet-overlay" onClick={() => { setConvertMenu(null); setActiveBlockMenu(null); }} />
           <div className="mobile-sheet">
             <div className="mobile-sheet-title">转换为...</div>
             <button onClick={() => handleTypeChange(convertMenu.blockId, 'text')}>📝 文本</button>
@@ -509,7 +513,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
             <button onClick={() => handleTypeChange(convertMenu.blockId, 'bulleted_list')}>• 无序列表</button>
             <button onClick={() => handleTypeChange(convertMenu.blockId, 'numbered_list')}>1. 有序列表</button>
             <button onClick={() => handleTypeChange(convertMenu.blockId, 'toggle')}>▼ 折叠列表</button>
-            <button className="mobile-sheet-cancel" onClick={() => setConvertMenu(null)}>取消</button>
+            <button className="mobile-sheet-cancel" onClick={() => { setConvertMenu(null); setActiveBlockMenu(null); }}>取消</button>
           </div>
         </>
       )}
