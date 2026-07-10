@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useTasks, isNotificationEnabled, setNotificationEnabled, requestNotificationPermission, calcProcrastinationIndex, getDeadlinePressure, getStreakData } from "./hooks/useTasks";
 import { useAuth } from "./hooks/useAuth";
+import { useMediaQuery } from "./hooks/useMediaQuery";
 import { formatCountdown, fmtDate } from "./utils/dateUtils";
 import AIChat from "./components/AIChat";
 import SplashScreen from "./components/SplashScreen";
@@ -184,6 +185,8 @@ function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('ima_theme') || 'light');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef(null);
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const [form, setForm] = useState({
     title: "", typeId: "", startDate: "", endDate: "", notes: "",
@@ -247,6 +250,11 @@ function App() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [settingsOpen]);
+
+  // Close mobile sidebar on view change
+  useEffect(() => {
+    if (isMobile) setMobileSidebarOpen(false);
+  }, [view, isMobile]);
 
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
 
@@ -498,7 +506,12 @@ function App() {
 
   return (
     <div className="app">
-      <aside className={`sidebar ${sidebarExpanded ? 'expanded' : 'collapsed'}`}>
+      {/* Mobile overlay */}
+      {isMobile && mobileSidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setMobileSidebarOpen(false)} />
+      )}
+
+      <aside className={`sidebar ${isMobile ? 'mobile' : sidebarExpanded ? 'expanded' : 'collapsed'} ${isMobile && mobileSidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-inner">
         <div className="sidebar-header">
           <h1 className="logo">
@@ -589,6 +602,15 @@ function App() {
       </aside>
 
       <main className={`main ${sidebarExpanded ? 'pushed' : ''}`}>
+        {/* Mobile hamburger */}
+        {isMobile && (
+          <button className="mobile-menu-btn" onClick={() => setMobileSidebarOpen(true)} aria-label="菜单">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+          </button>
+        )}
+
         {view === "tasks" && (
           <>
             <header className="main-header">

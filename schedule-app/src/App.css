@@ -480,6 +480,14 @@ button:active { transform: scale(0.98); }
   opacity: 0; transition: opacity 0.2s;
 }
 .task-card:hover .task-actions { opacity: 1; }
+/* Touch devices: always show actions */
+@media (hover: none) and (pointer: coarse) {
+  .task-actions { opacity: 1; }
+  .task-actions .btn-icon-sm {
+    min-width: 40px; min-height: 40px;
+    display: flex; align-items: center; justify-content: center;
+  }
+}
 
 .task-title {
   font-size: 18px; font-weight: 700;
@@ -583,6 +591,10 @@ button:active { transform: scale(0.98); }
   width: 44px; justify-content: flex-end; gap: 2px;
 }
 .block-actions.visible { opacity: 1; }
+/* Touch devices: block actions always visible */
+@media (hover: none) and (pointer: coarse) {
+  .block-actions { opacity: 1; }
+}
 
 .block-add {
   width: 20px; height: 20px; border-radius: 6px;
@@ -1324,71 +1336,239 @@ button:active { transform: scale(0.98); }
 .splash-footer.visible { opacity: 1; }
 
 /* =============================================
+   Mobile Sidebar Drawer
+   ============================================= */
+.sidebar-overlay {
+  position: fixed; inset: 0; z-index: 149;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: overlayIn 0.25s ease;
+}
+@keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+
+.mobile-menu-btn {
+  position: fixed; top: 12px; left: 12px; z-index: 50;
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; box-shadow: var(--shadow-sm);
+  color: var(--text); padding: 0; cursor: pointer;
+  transition: background 0.2s;
+}
+.mobile-menu-btn:hover { background: var(--surface2); }
+
+/* =============================================
    Responsive
    ============================================= */
 @media (max-width: 768px) {
   .app { flex-direction: column; }
 
-  .sidebar {
-    position: static; width: 100%; min-width: 0;
-    padding: 12px 16px; height: auto;
-    border-right: none; border-bottom: 1px solid var(--border);
-    background: var(--surface);
+  /* Sidebar → left drawer */
+  .sidebar.mobile {
+    position: fixed; left: 0; top: 0; height: 100vh; width: 260px;
+    z-index: 150; overflow-y: auto;
+    transform: translateX(-100%);
+    transition: transform 0.3s var(--ease-out);
+    box-shadow: none;
   }
-  .sidebar.expanded, .sidebar.collapsed { width: 100%; }
-  .sidebar.collapsed:hover { box-shadow: none; width: 100%; }
-  .sidebar-header { width: 100%; margin-bottom: 8px; }
-  .sidebar.collapsed .logo-text,
-  .sidebar.expanded .logo-text { opacity: 1; max-width: 120px; }
+  .sidebar.mobile.open {
+    transform: translateX(0);
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.15);
+  }
+  .sidebar.mobile .sidebar-inner {
+    padding: 24px 16px;
+    overflow-y: auto;
+  }
+  /* When mobile, always show labels */
+  .sidebar.mobile .logo-text,
+  .sidebar.mobile .nav-label,
+  .sidebar.mobile .settings-btn .nav-label { opacity: 1; max-width: 140px; }
+  .sidebar.mobile .sidebar-section,
+  .sidebar.mobile .sidebar-stats { max-height: 200px; opacity: 1; }
+  .sidebar.mobile.collapsed:hover { width: 260px; box-shadow: none; }
+
   .sidebar-pin-btn { display: none !important; }
 
-  .sidebar nav {
-    flex-direction: row; flex-wrap: wrap; gap: 4px; width: 100%;
-  }
-  .nav-btn {
-    padding: 10px 14px; font-size: 14px; gap: 8px;
-    flex: 1; min-width: 64px; justify-content: center;
-  }
-  .sidebar.collapsed .nav-label,
-  .sidebar.expanded .nav-label { opacity: 1; max-width: 140px; }
-  .sidebar-stats, .notif-toggle { display: none !important; }
-  .sidebar.collapsed .sidebar-section,
-  .sidebar.expanded .sidebar-section { max-height: 0; opacity: 0; padding: 0; margin: 0; border: none; }
-  .settings-wrapper { width: auto; }
-  .settings-btn { width: auto; padding: 10px 14px; }
-  .settings-dropdown {
-    position: fixed; bottom: auto; top: 60px; left: 16px; right: 16px;
-    margin-bottom: 0;
-  }
-
-  .main { padding: 24px !important; }
-  .main.pushed { padding: 24px !important; }
+  .main { padding: 20px 16px 80px !important; padding-top: 64px !important; }
+  .main.pushed { padding: 20px 16px 80px !important; padding-top: 64px !important; }
 
   .skeleton-container { flex-direction: column; }
-  .skeleton-sidebar {
-    width: 100%; min-width: 0;
-    flex-direction: row; flex-wrap: wrap;
-    padding: 12px 16px; height: auto;
-    background: var(--surface);
-  }
-  .skeleton-logo { margin: 0 10px 0 0; }
-  .skeleton-nav { flex-direction: row; flex-wrap: wrap; gap: 6px; flex: 1; }
-  .skeleton-nav-item { height: 36px; flex: 1; min-width: 56px; }
-  .skeleton-stats { display: none; }
-  .skeleton-main { padding: 24px; }
-  .skeleton-grid { grid-template-columns: 1fr; }
+  .skeleton-sidebar { display: none; }
+  .skeleton-main { padding: 20px 16px; }
 
   .task-grid { grid-template-columns: 1fr; }
   .analytics-grid { grid-template-columns: 1fr; }
+  .import-area { grid-template-columns: 1fr; }
+  .pomodoro-container { grid-template-columns: 1fr; }
+
   .filter-bar { flex-direction: column; align-items: stretch; }
   .search-input { max-width: none; }
+
+  .main-header { flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+  .main-header h2 { font-size: 26px; }
+  .main-header .btn-primary { width: 100%; }
+
+  .task-card { padding: 18px 20px; border-radius: 0 var(--radius) var(--radius) 0; }
+  .task-title { font-size: 16px; }
+
+  .pomodoro-card { padding: 28px 20px; gap: 20px; }
   .pomodoro-time { font-size: 56px; }
-  .pomodoro-container { grid-template-columns: 1fr; }
+  .pomodoro-actions button { padding: 12px 24px; font-size: 14px; }
+  .pomodoro-info { padding: 24px; }
+
+  .chart-card { padding: 24px; }
+  .import-card { padding: 24px; }
+
   .pressure-chart { gap: 2px; }
   .streak-day { width: 12px; height: 12px; }
-  .ai-chat-container { height: calc(100vh - 160px); }
-  .ai-chat-message { max-width: 90%; }
-  .task-detail-page { padding: 24px; }
+
+  .ai-chat-container { height: calc(100vh - 200px); max-height: none; }
+  .ai-chat-message { max-width: 92%; }
+  .ai-chat-input-bar { padding: 14px 16px; }
+  .ai-chat-quick-actions { padding: 12px 16px; }
+  .ai-chat-messages { padding: 20px; }
+
+  .task-detail-page { padding: 20px 16px; }
   .task-detail-title { font-size: 28px; }
+
+  /* Modal → fullscreen on mobile */
+  .modal {
+    width: 100%; max-width: 100%;
+    height: 100vh; max-height: 100vh;
+    border-radius: 0; padding: 24px 20px;
+    display: flex; flex-direction: column;
+  }
+  .modal form { flex: 1; overflow-y: auto; padding-bottom: 16px; }
   .form-row { grid-template-columns: 1fr; }
+
+  .auth-card { padding: 32px 24px; }
+
+  /* Settings dropdown mobile */
+  .settings-dropdown {
+    position: fixed; bottom: auto; top: 60px; left: 16px; right: auto;
+    width: 240px; margin-bottom: 0;
+  }
+
+  /* Type management */
+  .type-form { flex-direction: column; align-items: stretch; }
+  .type-form input { width: 100%; }
+}
+
+/* =============================================
+   Small phone breakpoint (≤480px)
+   ============================================= */
+@media (max-width: 480px) {
+  :root { font-size: 14px; }
+
+  .sidebar.mobile { width: 85vw; max-width: 280px; }
+
+  .main { padding: 12px 12px 80px !important; padding-top: 60px !important; }
+  .main.pushed { padding: 12px 12px 80px !important; padding-top: 60px !important; }
+
+  .mobile-menu-btn { top: 8px; left: 8px; width: 40px; height: 40px; }
+  .main-header h2 { font-size: 22px; }
+  .main-header .btn-primary { font-size: 14px; padding: 10px 20px; }
+
+  .task-card { padding: 16px; }
+  .task-title { font-size: 15px; }
+  .toggle-btn { font-size: 12px; padding: 6px 16px; }
+
+  .chart-card { padding: 18px; }
+  .chart-card h4 { font-size: 15px; margin-bottom: 16px; }
+
+  .analytics-grid { gap: 16px; }
+
+  .pomodoro-card { padding: 24px 16px; gap: 16px; }
+  .pomodoro-time { font-size: 48px; }
+  .pomodoro-mode-btn { padding: 8px 16px; font-size: 12px; }
+
+  .modal { padding: 20px 14px; }
+  .modal h3 { font-size: 19px; margin-bottom: 20px; }
+  .modal .form-row { gap: 12px; }
+
+  .ai-chat-quick-actions { padding: 10px 12px; gap: 6px; }
+  .ai-chat-quick-btn { padding: 8px 14px; font-size: 12px; }
+  .ai-chat-input-bar { padding: 10px 12px; gap: 8px; }
+  .ai-chat-input-bar input { padding: 10px 14px; font-size: 14px; }
+  .ai-chat-input-bar button { padding: 10px 18px; font-size: 14px; }
+  .ai-chat-message { max-width: 95%; }
+
+  .task-detail-title { font-size: 24px; }
+  .task-detail-page { padding: 16px 12px; }
+
+  .import-card { padding: 20px 18px; }
+  .import-card h3 { font-size: 17px; }
+
+  /* Summary grid */
+  .summary-grid { gap: 16px; }
+  .sum-val { font-size: 28px; }
+
+  .procrastination-score { font-size: 56px; }
+  .procrastination-label { font-size: 16px; }
+
+  .auth-card { padding: 28px 20px; }
+  .auth-logo { font-size: 24px; }
+
+  /* Skeleton */
+  .skeleton-main { padding: 12px; }
+  .skeleton-title { width: 120px; height: 32px; }
+  .skeleton-grid { gap: 12px; }
+}
+
+/* =============================================
+   Touch-friendly sizing
+   ============================================= */
+@media (hover: none) and (pointer: coarse) {
+  /* Enlarge tap targets */
+  .nav-btn, .settings-btn {
+    min-height: 44px;
+  }
+  .btn-icon, .btn-icon-sm {
+    min-width: 40px; min-height: 40px;
+  }
+  .toggle-btn {
+    min-height: 40px; padding: 9px 22px;
+  }
+  .color-swatch {
+    min-width: 36px; min-height: 36px;
+  }
+  .subtask-item input[type="checkbox"] {
+    min-width: 20px; min-height: 20px;
+  }
+  .block-todo-row input[type="checkbox"] {
+    min-width: 20px; min-height: 20px;
+  }
+
+  /* Task card hover transform - disable on touch */
+  .task-card:hover {
+    transform: none;
+  }
+  .task-card:active {
+    transform: scale(0.99);
+  }
+
+  /* Modal closer touch target */
+  .form-actions button {
+    min-height: 44px;
+  }
+}
+
+/* =============================================
+   Safe area for notched phones
+   ============================================= */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .main {
+    padding-bottom: calc(48px + env(safe-area-inset-bottom));
+  }
+  @media (max-width: 768px) {
+    .main, .main.pushed {
+      padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+    }
+  }
+  @media (max-width: 480px) {
+    .main, .main.pushed {
+      padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+    }
+  }
 }
