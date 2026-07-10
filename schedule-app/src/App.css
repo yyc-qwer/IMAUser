@@ -574,48 +574,160 @@ button:active { transform: scale(0.98); }
    Notion Block Editor
    ============================================= */
 .notion-editor { position: relative; padding: 8px 0; }
+.notion-block-wrapper { position: relative; }
+
 .notion-block {
   display: flex; align-items: flex-start;
-  padding: 4px 0; min-height: 34px;
-  position: relative; border-radius: 6px;
-  transition: background 0.15s;
+  padding: 6px 0; min-height: 36px; gap: 4px;
+  position: relative; border-radius: 8px;
+  transition: background 0.15s, transform 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out), opacity 0.2s var(--ease-out);
   touch-action: manipulation;
 }
 .notion-block:hover { background: var(--surface2); }
-.notion-block.dragging { opacity: 0.5; }
-.notion-block.drag-over { border-top: 2px solid var(--primary); }
+.notion-block.dragging {
+  opacity: 0.4;
+  transform: scale(0.98);
+  background: var(--primary-light);
+  box-shadow: 0 0 0 2px var(--primary);
+}
+.notion-block.drag-over {
+  border-top: 3px solid var(--primary);
+  padding-top: 3px;
+}
 
+/* Desktop block actions (left side) */
 .block-actions {
   display: flex; align-items: center;
-  position: absolute; left: 0; top: 4px;
+  position: absolute; left: 0; top: 6px;
   opacity: 0; transition: opacity 0.15s;
   width: 44px; justify-content: flex-end; gap: 2px;
+  pointer-events: none;
+  transform: translateX(-100%);
 }
-.block-actions.visible { opacity: 1; }
-/* Touch devices: block actions always visible */
-@media (hover: none) and (pointer: coarse) {
-  .block-actions { opacity: 1; }
+.block-actions.visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .block-add {
-  width: 20px; height: 20px; border-radius: 6px;
+  width: 22px; height: 22px; border-radius: 6px;
   border: none; background: none; color: var(--text3);
-  font-size: 14px; cursor: pointer;
+  font-size: 15px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  touch-action: manipulation;
+  transition: background 0.15s, color 0.15s;
 }
-.block-add:hover { background: var(--surface); color: var(--text); }
+.block-add:hover { background: var(--surface2); color: var(--primary); }
 
 .block-handle {
-  width: 20px; height: 20px; border-radius: 6px;
+  width: 22px; height: 22px; border-radius: 6px;
   border: none; background: none; color: var(--text3);
   font-size: 10px; cursor: grab;
   display: flex; align-items: center; justify-content: center;
-  touch-action: manipulation;
+  transition: background 0.15s, color 0.15s;
 }
-.block-handle:hover { background: var(--surface); color: var(--text); }
+.block-handle:hover { background: var(--surface2); color: var(--text); }
 .block-handle:active { cursor: grabbing; }
 
+/* Mobile: inline + separator between blocks */
+.block-add-separator {
+  display: flex; align-items: center; justify-content: center;
+  height: 4px; position: relative;
+}
+.block-add-inline {
+  width: 32px; height: 32px; border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--primary); font-size: 18px; font-weight: 700;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+  position: absolute; z-index: 1;
+  opacity: 0; transform: scale(0.8);
+}
+.block-add-separator:hover .block-add-inline,
+.block-add-separator:active .block-add-inline {
+  opacity: 1; transform: scale(1);
+}
+/* Mobile: always show the first and last separator */
+.notion-block-wrapper:first-child .block-add-separator {
+  height: 6px;
+}
+.notion-block-wrapper:first-child .block-add-separator .block-add-inline {
+  opacity: 0.55;
+}
+
+/* Mobile: right-side menu button */
+.block-mobile-menu-btn {
+  width: 36px; min-width: 36px; height: 36px;
+  border: none; background: none;
+  color: var(--text3); font-size: 16px;
+  cursor: pointer; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.block-mobile-menu-btn:active { background: var(--surface2); color: var(--text); }
+
+/* Mobile: dropdown menu per block */
+.block-mobile-menu {
+  position: absolute; right: 4px; top: 100%;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 14px; padding: 6px;
+  min-width: 160px; z-index: 100;
+  box-shadow: var(--shadow-lg);
+}
+.block-mobile-menu button {
+  display: block; width: 100%;
+  text-align: left; background: none; border: none;
+  padding: 12px 16px; font-size: 14px; font-weight: 600;
+  color: var(--text); cursor: pointer;
+  border-radius: 10px;
+  transition: background 0.12s;
+}
+.block-mobile-menu button:hover,
+.block-mobile-menu button:active { background: var(--surface2); }
+.block-mobile-menu button:disabled { opacity: 0.3; pointer-events: none; }
+
+/* Mobile: convert type bottom sheet */
+.mobile-sheet-overlay {
+  position: fixed; inset: 0; z-index: 250;
+  background: rgba(0,0,0,0.3);
+}
+.mobile-sheet {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--surface);
+  border-radius: 20px 20px 0 0;
+  padding: 20px 20px 32px; z-index: 251;
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.15);
+  animation: slideUp 0.25s var(--ease-out);
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.mobile-sheet-title {
+  font-size: 13px; font-weight: 700; color: var(--text2);
+  text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 12px; text-align: center;
+}
+.mobile-sheet button {
+  display: block; width: 100%;
+  text-align: left; background: none; border: none;
+  padding: 14px 20px; font-size: 16px; font-weight: 600;
+  color: var(--text); cursor: pointer;
+  border-radius: 12px;
+  transition: background 0.12s;
+}
+.mobile-sheet button:hover,
+.mobile-sheet button:active { background: var(--surface2); }
+.mobile-sheet-cancel {
+  margin-top: 6px; color: var(--text2) !important;
+  font-weight: 500 !important;
+  text-align: center !important;
+}
+
+/* Block content (shared desktop + mobile) */
 .block-content {
   flex: 1; padding: 3px 6px; font-size: 15px;
   background: none; border: none; outline: none;
@@ -624,29 +736,32 @@ button:active { transform: scale(0.98); }
   touch-action: manipulation;
 }
 .block-content::placeholder { color: var(--text3); }
+.block-content.done { text-decoration: line-through; color: var(--text3); }
 
 .block-todo-row { display: flex; align-items: center; gap: 10px; flex: 1; }
-.block-todo-row input[type="checkbox"] { accent-color: var(--success); cursor: pointer; }
-.block-todo-row .done { text-decoration: line-through; color: var(--text3); }
+.block-todo-row input[type="checkbox"] {
+  accent-color: var(--success); cursor: pointer;
+  width: 18px; height: 18px; flex-shrink: 0;
+}
 
 .block-toggle-row { display: flex; align-items: center; gap: 8px; flex: 1; }
 .toggle-btn-small {
-  width: 20px; height: 20px; border: none; background: none;
+  width: 22px; height: 22px; border: none; background: none;
   color: var(--text3); font-size: 10px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  border-radius: 4px;
-  touch-action: manipulation;
+  border-radius: 4px; flex-shrink: 0;
+  transition: background 0.15s;
 }
-.toggle-btn-small:hover { background: var(--surface); }
+.toggle-btn-small:hover { background: var(--surface2); }
 
 .block-list-row { display: flex; align-items: center; gap: 10px; flex: 1; }
-.list-bullet { color: var(--primary); font-size: 20px; line-height: 1; font-weight: 700; }
+.list-bullet { color: var(--primary); font-size: 20px; line-height: 1; font-weight: 700; flex-shrink: 0; }
 .list-number {
   color: var(--text3); font-size: 14px;
-  min-width: 22px; text-align: right; font-weight: 600;
+  min-width: 22px; text-align: right; font-weight: 600; flex-shrink: 0;
 }
 
-/* Convert Menu */
+/* Desktop Convert Menu */
 .convert-menu {
   position: fixed; background: var(--surface);
   border: 1.5px solid var(--border); border-radius: var(--radius-lg);
@@ -1439,22 +1554,12 @@ button:active { transform: scale(0.98); }
   .task-detail-title { font-size: 28px; }
 
   /* Block editor mobile */
-  .notion-block { min-height: 44px; padding: 6px 0; }
-  .notion-block.mobile .block-actions { left: 4px; top: 6px; width: auto; gap: 6px; }
-  .notion-block.mobile .block-add,
-  .notion-block.mobile .block-handle {
-    width: 38px; height: 38px; font-size: 16px;
-    border-radius: 10px;
-    background: var(--surface);
-    border: 1.5px solid var(--border);
-    display: flex; align-items: center; justify-content: center;
-  }
-  .notion-block.mobile .block-add { font-size: 20px; font-weight: 700; color: var(--primary); }
-  .notion-block.mobile .block-handle { font-size: 14px; }
-  .notion-block.mobile .block-add:active,
-  .notion-block.mobile .block-handle:active { background: var(--primary-light); }
-  .notion-block.mobile .toggle-btn-small { width: 32px; height: 32px; font-size: 14px; }
+  .notion-block { min-height: 44px; padding: 8px 0; }
   .notion-block.mobile .block-content { font-size: 16px; padding: 8px 6px; min-height: 36px; }
+  .notion-block.mobile .toggle-btn-small { width: 32px; height: 32px; font-size: 14px; }
+  .block-mobile-menu-btn { width: 40px; min-width: 40px; height: 40px; }
+  .block-add-separator { height: 8px; }
+  .block-add-inline { width: 36px; height: 36px; font-size: 20px; }
   .task-detail-editor { overscroll-behavior: contain; }
 
   /* Modal → fullscreen on mobile */
@@ -1522,8 +1627,8 @@ button:active { transform: scale(0.98); }
   .task-detail-title { font-size: 24px; }
   .task-detail-page { padding: 16px 12px; }
   .task-detail-editor { overscroll-behavior: contain; }
-  .notion-block.mobile .block-add,
-  .notion-block.mobile .block-handle { width: 36px; height: 36px; }
+  .block-add-inline { width: 32px; height: 32px; font-size: 18px; }
+  .block-mobile-menu-btn { width: 36px; min-width: 36px; height: 36px; }
 
   .import-card { padding: 20px 18px; }
   .import-card h3 { font-size: 17px; }
@@ -1568,18 +1673,13 @@ button:active { transform: scale(0.98); }
     min-width: 20px; min-height: 20px;
   }
 
-  /* Block editor: enlarge touch targets */
-  .block-add, .block-handle {
-    min-width: 36px; min-height: 36px;
-    font-size: 16px;
-  }
-  .toggle-btn-small {
-    min-width: 32px; min-height: 32px;
-    font-size: 14px;
-  }
-  .notion-block { min-height: 42px; }
-  .block-content { font-size: 16px; min-height: 36px; padding: 6px 6px; }
-  .block-actions { width: auto; gap: 6px; left: 2px; }
+  /* Block editor touch targets */
+  .block-add-inline { min-width: 40px; min-height: 40px; }
+  .block-mobile-menu-btn { min-width: 44px; min-height: 44px; }
+  .toggle-btn-small { min-width: 32px; min-height: 32px; font-size: 14px; }
+  .notion-block { min-height: 44px; }
+  .block-content { font-size: 16px; min-height: 36px; padding: 8px 6px; }
+  .block-mobile-menu button { min-height: 48px; }
 
   /* Task detail back button */
   .task-detail-header .btn-secondary {

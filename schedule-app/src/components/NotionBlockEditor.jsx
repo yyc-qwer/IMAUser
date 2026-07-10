@@ -9,6 +9,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
   const [hoverId, setHoverId] = useState(null);
   const [focusId, setFocusId] = useState(null);
   const [convertMenu, setConvertMenu] = useState(null);
+  const [activeBlockMenu, setActiveBlockMenu] = useState(null); // mobile right-side menu
   const editorRef = useRef(null);
   const loadedRef = useRef(false);
 
@@ -84,6 +85,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     setBlocks(prev => prev.map(b => b.id === id ? { ...b, type: newType } : b));
     await updateBlock(id, { type: newType });
     setConvertMenu(null);
+    setActiveBlockMenu(null);
   };
 
   const handleIndent = async (id, delta) => {
@@ -94,11 +96,50 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     await updateBlock(id, { indent: newIndent });
   };
 
-  // 拖拽排序
-  const handleDragStart = (e, id) => { setDragId(id); e.dataTransfer.effectAllowed = 'move'; };
-  const handleDragOver = (e, id) => { e.preventDefault(); if (id !== dragId) setDragOverId(id); };
+  // 移动端上下移动排序
+  const handleMoveUp = async (idx) => {
+    if (idx <= 0) return;
+    const newBlocks = [...blocks];
+    [newBlocks[idx - 1], newBlocks[idx]] = [newBlocks[idx], newBlocks[idx - 1]];
+    const reordered = newBlocks.map((b, i) => ({ ...b, order: i }));
+    setBlocks(reordered);
+    setActiveBlockMenu(null);
+    await saveOrder(reordered);
+  };
+
+  const handleMoveDown = async (idx) => {
+    if (idx >= blocks.length - 1) return;
+    const newBlocks = [...blocks];
+    [newBlocks[idx], newBlocks[idx + 1]] = [newBlocks[idx + 1], newBlocks[idx]];
+    const reordered = newBlocks.map((b, i) => ({ ...b, order: i }));
+    setBlocks(reordered);
+    setActiveBlockMenu(null);
+    await saveOrder(reordered);
+  };
+
+  // 拖拽排序 (桌面端)
+  const handleDragStart = (e, id) => {
+    setDragId(id);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
+    // 设置拖拽图像为透明，避免浏览器默认拖拽图
+    const ghost = document.createElement('div');
+    ghost.style.opacity = '0';
+    ghost.style.position = 'absolute';
+    ghost.style.top = '-1000px';
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, 0, 0);
+    setTimeout(() => document.body.removeChild(ghost), 0);
+  };
+
+  const handleDragOver = (e, id) => {
+    e.preventDefault();
+    if (id !== dragId) setDragOverId(id);
+  };
+
   const handleDrop = async (e, targetId) => {
-    e.preventDefault(); setDragOverId(null);
+    e.preventDefault();
+    setDragOverId(null);
     if (!dragId || dragId === targetId) { setDragId(null); return; }
     const from = blocks.findIndex(b => b.id === dragId);
     const to = blocks.findIndex(b => b.id === targetId);
@@ -117,7 +158,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
       value: b.content,
       onChange: e => handleChange(b.id, e.target.value),
       onKeyDown: e => handleKeyDown(e, b.id),
-      className: `block-content ${b.type}`,
+      className: `block-content ${b.type} ${b.meta?.checked ? 'done' : ''}`,
       placeholder: getPlaceholder(b.type),
     };
 
@@ -198,6 +239,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     const click = (e) => {
       if (editorRef.current && !editorRef.current.contains(e.target)) {
         setConvertMenu(null);
+        setActiveBlockMenu(null);
       }
     };
     document.addEventListener('click', click);
@@ -217,39 +259,94 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
   };
 
   return (
-    <div className="notion-editor" ref={editorRef}>
+    <div className={`notion-editor ${isMobile ? 'mobile' : ''}`} ref={editorRef}>
       {blocks.map((b, i) => (
-        <div
-          key={b.id}
-          className={`notion-block ${b.type} ${isMobile ? 'mobile' : ''} ${dragId === b.id ? 'dragging' : ''} ${dragOverId === b.id ? 'drag-over' : ''}`}
-          style={{ paddingLeft: `${(b.indent || 0) * 24 + (isMobile ? 48 : 40)}px` }}
-          draggable={!isMobile}
-          onDragStart={isMobile ? undefined : e => handleDragStart(e, b.id)}
-          onDragOver={isMobile ? undefined : e => handleDragOver(e, b.id)}
-          onDrop={isMobile ? undefined : e => handleDrop(e, b.id)}
-          onDragEnd={isMobile ? undefined : () => { setDragId(null); setDragOverId(null); }}
-          onMouseEnter={isMobile ? undefined : () => setHoverId(b.id)}
-          onMouseLeave={isMobile ? undefined : () => setHoverId(null)}
-          data-block-id={b.id}
-        >
-          <div className={`block-actions ${isMobile || hoverId === b.id ? 'visible' : ''}`}>
-            <button className="block-add" title="下方添加" onClick={(e) => { e.stopPropagation(); handleAdd(i); }}>+</button>
-            <button
-              className="block-handle"
-              title={isMobile ? "转换类型" : "拖拽排序 / 转换类型"}
-              onClick={(e) => {
-                e.stopPropagation();
-                const rect = e.currentTarget.getBoundingClientRect();
-                setConvertMenu({ x: Math.min(rect.left, window.innerWidth - 200), y: rect.bottom + 4, blockId: b.id });
-              }}
-            >⋮⋮</button>
+        <div key={b.id} className="notion-block-wrapper">
+          {/* Mobile: inline + separator between blocks */}
+          {isMobile && (
+            <div className="block-add-separator">
+              <button
+                className="block-add-inline"
+                onClick={() => handleAdd(i - 1)}
+                title="添加块"
+              >+</button>
+            </div>
+          )}
+
+          <div
+            className={`notion-block ${b.type} ${isMobile ? 'mobile' : ''} ${dragId === b.id ? 'dragging' : ''} ${dragOverId === b.id ? 'drag-over' : ''}`}
+            style={{ paddingLeft: `${(b.indent || 0) * 24 + 8}px` }}
+            draggable={!isMobile}
+            onDragStart={isMobile ? undefined : e => handleDragStart(e, b.id)}
+            onDragOver={isMobile ? undefined : e => handleDragOver(e, b.id)}
+            onDrop={isMobile ? undefined : e => handleDrop(e, b.id)}
+            onDragEnd={isMobile ? undefined : () => { setDragId(null); setDragOverId(null); }}
+            onMouseEnter={isMobile ? undefined : () => setHoverId(b.id)}
+            onMouseLeave={isMobile ? undefined : () => setHoverId(null)}
+            data-block-id={b.id}
+          >
+            {/* Desktop: left-side block actions */}
+            {!isMobile && (
+              <div className={`block-actions ${hoverId === b.id ? 'visible' : ''}`}>
+                <button className="block-add" title="下方添加" onClick={(e) => { e.stopPropagation(); handleAdd(i); }}>+</button>
+                <button
+                  className="block-handle"
+                  title="拖拽排序 / 转换类型"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setConvertMenu({ x: rect.left, y: rect.bottom + 4, blockId: b.id });
+                  }}
+                >⋮⋮</button>
+              </div>
+            )}
+
+            {renderBlockContent(b)}
+
+            {/* Mobile: right-side action button */}
+            {isMobile && (
+              <button
+                className="block-mobile-menu-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveBlockMenu(activeBlockMenu === b.id ? null : b.id);
+                  setConvertMenu(null);
+                }}
+              >⋮</button>
+            )}
           </div>
 
-          {renderBlockContent(b)}
+          {/* Mobile: dropdown menu for this block */}
+          {isMobile && activeBlockMenu === b.id && (
+            <div className="block-mobile-menu">
+              <button onClick={() => handleAdd(i)}>+ 下方添加</button>
+              <button onClick={() => { setConvertMenu({ blockId: b.id, mobile: true }); setActiveBlockMenu(null); }}>⇄ 转换类型</button>
+              <button onClick={() => handleMoveUp(i)} disabled={i === 0}>↑ 上移</button>
+              <button onClick={() => handleMoveDown(i)} disabled={i >= blocks.length - 1}>↓ 下移</button>
+              <button onClick={() => handleIndent(b.id, 1)}>→ 增加缩进</button>
+              <button onClick={() => handleIndent(b.id, -1)}>← 减少缩进</button>
+              <button onClick={() => { handleDelete(b.id); setActiveBlockMenu(null); }}
+                style={{ color: 'var(--danger)' }}
+                disabled={blocks.length <= 1}
+              >✕ 删除</button>
+            </div>
+          )}
         </div>
       ))}
 
-      {convertMenu && (
+      {/* Mobile: + separator at the very bottom for adding after last block */}
+      {isMobile && blocks.length > 0 && (
+        <div className="block-add-separator">
+          <button
+            className="block-add-inline"
+            onClick={() => handleAdd(blocks.length - 1)}
+            title="末尾添加"
+          >+</button>
+        </div>
+      )}
+
+      {/* Desktop: convert menu */}
+      {convertMenu && !convertMenu.mobile && (
         <div className="convert-menu" style={{ left: convertMenu.x, top: convertMenu.y }}>
           <div className="convert-item" onClick={() => handleTypeChange(convertMenu.blockId, 'text')}>📝 文本</div>
           <div className="convert-item" onClick={() => handleTypeChange(convertMenu.blockId, 'heading')}># 标题</div>
@@ -258,6 +355,23 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
           <div className="convert-item" onClick={() => handleTypeChange(convertMenu.blockId, 'numbered_list')}>1. 有序列表</div>
           <div className="convert-item" onClick={() => handleTypeChange(convertMenu.blockId, 'toggle')}>▼ 折叠列表</div>
         </div>
+      )}
+
+      {/* Mobile: convert type bottom sheet */}
+      {convertMenu && convertMenu.mobile && (
+        <>
+          <div className="mobile-sheet-overlay" onClick={() => setConvertMenu(null)} />
+          <div className="mobile-sheet">
+            <div className="mobile-sheet-title">转换为...</div>
+            <button onClick={() => handleTypeChange(convertMenu.blockId, 'text')}>📝 文本</button>
+            <button onClick={() => handleTypeChange(convertMenu.blockId, 'heading')}># 标题</button>
+            <button onClick={() => handleTypeChange(convertMenu.blockId, 'todo')}>☑️ 待办</button>
+            <button onClick={() => handleTypeChange(convertMenu.blockId, 'bulleted_list')}>• 无序列表</button>
+            <button onClick={() => handleTypeChange(convertMenu.blockId, 'numbered_list')}>1. 有序列表</button>
+            <button onClick={() => handleTypeChange(convertMenu.blockId, 'toggle')}>▼ 折叠列表</button>
+            <button className="mobile-sheet-cancel" onClick={() => setConvertMenu(null)}>取消</button>
+          </div>
+        </>
       )}
     </div>
   );
