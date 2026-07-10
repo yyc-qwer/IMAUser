@@ -7,7 +7,7 @@ import SplashScreen from "./components/SplashScreen";
 import Skeleton from "./components/Skeleton";
 import TaskDetailPage from "./components/TaskDetailPage";
 
-const COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
+const COLORS = ["#5b9bd5", "#d9544f", "#3d7a5c", "#d4a853", "#7c6fb0", "#d4668e", "#3ba3b8", "#d4855e"];
 
 // ===== Pomodoro Timer Component =====
 function PomodoroTimer() {
@@ -18,9 +18,9 @@ function PomodoroTimer() {
   const intervalRef = useRef(null);
 
   const modes = {
-    work: { min: 25, label: '专注', color: '#ef4444' },
-    shortBreak: { min: 5, label: '短休息', color: '#10b981' },
-    longBreak: { min: 15, label: '长休息', color: '#e07b5a' },
+    work: { min: 25, label: '专注', color: '#d9544f' },
+    shortBreak: { min: 5, label: '短休息', color: '#3d7a5c' },
+    longBreak: { min: 15, label: '长休息', color: '#d4855e' },
   };
 
   useEffect(() => {
@@ -788,11 +788,11 @@ function App() {
 function TaskCard({ task, typeName, color, done, onToggle, onEdit, onDelete, onExpand, onOpenDetail, expanded, subtaskProps }) {
   const cd = formatCountdown(task);
   const priorityLabel = { high: "高", medium: "中", low: "低" }[task.priority || "medium"];
-  const priorityColor = { high: "#ef4444", medium: "#f59e0b", low: "#10b981" }[task.priority || "medium"];
+  const priorityColor = { high: "#d9544f", medium: "#d4855e", low: "#5b9bd5" }[task.priority || "medium"];
   const repeatLabel = { daily: "每天", weekly: "每周", none: "" }[task.repeatRule || "none"];
 
   return (
-    <div className={`task-card${done ? " done" : ""}`}>
+    <div className={`task-card${done ? " done" : ""}`} style={{ borderLeftColor: done ? undefined : color }}>
       <div className="task-card-top">
         <div className="task-badges">
           <span className="task-type-badge" style={{ background: color }}>{typeName}</span>
@@ -839,10 +839,10 @@ function AnalyticsView({ tasks, activeTasks, completedTasks, taskTypes, weeklySt
   // Streak color levels (GitHub style)
   const getStreakColor = (count) => {
     if (count === 0) return 'var(--surface2)';
-    if (count === 1) return '#0e4429';
-    if (count === 2) return '#006d32';
-    if (count <= 4) return '#26a641';
-    return '#39d353';
+    if (count === 1) return '#c8e6d4';
+    if (count === 2) return '#8cc9a0';
+    if (count <= 4) return '#4da16a';
+    return '#2d6a4f';
   };
 
   // Group streak days into weeks for grid display
@@ -866,7 +866,7 @@ function AnalyticsView({ tasks, activeTasks, completedTasks, taskTypes, weeklySt
           ) : (
             <div className="procrastination-content">
               <div className="procrastination-score" style={{
-                color: procrastinationIndex >= 80 ? '#10b981' : procrastinationIndex >= 60 ? '#f59e0b' : '#ef4444'
+                color: procrastinationIndex >= 80 ? '#3d7a5c' : procrastinationIndex >= 60 ? '#d4a853' : '#d9544f'
               }}>
                 {procrastinationIndex}
                 <span className="procrastination-max">/100</span>
@@ -877,7 +877,7 @@ function AnalyticsView({ tasks, activeTasks, completedTasks, taskTypes, weeklySt
               <div className="procrastination-bar">
                 <div className="procrastination-fill" style={{
                   width: `${procrastinationIndex}%`,
-                  background: procrastinationIndex >= 80 ? '#10b981' : procrastinationIndex >= 60 ? '#f59e0b' : '#ef4444'
+                  background: procrastinationIndex >= 80 ? '#3d7a5c' : procrastinationIndex >= 60 ? '#d4a853' : '#d9544f'
                 }} />
               </div>
               <p className="procrastination-hint">
@@ -902,7 +902,7 @@ function AnalyticsView({ tasks, activeTasks, completedTasks, taskTypes, weeklySt
                         className="pressure-bar"
                         style={{
                           height: `${(d.count / maxPressure) * 80}px`,
-                          background: d.count >= 3 ? '#ef4444' : d.count >= 1 ? '#f59e0b' : 'var(--surface2)',
+                          background: d.count >= 3 ? '#d9544f' : d.count >= 1 ? '#d4855e' : 'var(--surface2)',
                           opacity: d.isWeekend ? 0.6 : 1,
                         }}
                       />
