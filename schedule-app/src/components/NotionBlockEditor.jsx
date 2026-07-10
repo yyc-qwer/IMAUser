@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useBlocks } from '../hooks/useBlocks';
 
 export default function NotionBlockEditor({ taskId, isMobile }) {
@@ -9,10 +9,32 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
   const [hoverId, setHoverId] = useState(null);
   const [focusId, setFocusId] = useState(null);
   const [convertMenu, setConvertMenu] = useState(null);
-  const [activeBlockMenu, setActiveBlockMenu] = useState(null); // mobile right-side menu
+  const [activeBlockMenu, setActiveBlockMenu] = useState(null);
+
+  // -- Touch drag state (mobile) --
+  const [touchDrag, setTouchDrag] = useState(null); // { id, originalIdx, fromVisibleIdx, toVisibleIdx, y, startY }
+  const longPressTimer = useRef(null);
+  const touchStartPos = useRef(null);
   const editorRef = useRef(null);
   const loadedRef = useRef(false);
 
+  // -- Collapsed toggle: compute visible blocks --
+  const visibleBlocks = useMemo(() => {
+    const result = [];
+    let skipUntilIndent = Infinity;
+    for (let i = 0; i < blocks.length; i++) {
+      const b = blocks[i];
+      if (b.indent > skipUntilIndent) continue; // child of collapsed toggle → skip
+      skipUntilIndent = Infinity;
+      result.push({ block: b, originalIdx: i });
+      if (b.type === 'toggle' && b.meta?.collapsed) {
+        skipUntilIndent = b.indent;
+      }
+    }
+    return result;
+  }, [blocks]);
+
+  // -- Load --
   const load = useCallback(async () => {
     if (loadedRef.current) return;
     loadedRef.current = true;
@@ -33,16 +55,33 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     load();
   }, [load]);
 
+  // -- Persist order --
   const saveOrder = async (newBlocks) => {
     const ids = newBlocks.map(b => b.id);
     await reorderBlocks(ids);
   };
 
-  const handleAdd = async (afterIdx, type = 'text') => {
-    const insertIdx = afterIdx + 1;
-    const indent = blocks[afterIdx]?.indent || 0;
+  // -- Inherit type from parent block --
+  const getInheritedType = (parentBlock) => {
+    if (!parentBlock) return 'text';
+    const inheritTypes = ['toggle', 'bulleted_list', 'numbered_list', 'todo'];
+    if (inheritTypes.includes(parentBlock.type)) return parentBlock.type;
+    return 'text';
+  };
+
+  // -- Add block (inherits type) --
+  const handleAdd = async (afterVisibleIdx, forceType) => {
+    const v = visibleBlocks[afterVisibleIdx];
+    const parentBlock = v ? v.block : null;
+    const afterOriginalIdx = v ? v.originalIdx : (blocks.length > 0 ? blocks.length - 1 : -1);
+
+    const type = forceType || getInheritedType(parentBlock);
+    const indent = parentBlock?.indent || 0;
+    const insertIdx = afterOriginalIdx + 1;
+
     const b = await addBlock(taskId, type, '', insertIdx, indent);
     if (!b) return;
+
     const newBlocks = [...blocks];
     newBlocks.splice(insertIdx, 0, b);
     const reordered = newBlocks.map((blk, i) => ({ ...blk, order: i }));
@@ -51,11 +90,13 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     setFocusId(b.id);
   };
 
+  // -- Change content --
   const handleChange = async (id, content) => {
     setBlocks(prev => prev.map(b => b.id === id ? { ...b, content } : b));
     await updateBlock(id, { content });
   };
 
+  // -- Todo toggle --
   const handleToggle = async (id) => {
     const b = blocks.find(x => x.id === id);
     if (!b) return;
@@ -64,14 +105,17 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     await updateBlock(id, { meta: newMeta });
   };
 
+  // -- Toggle collapse --
   const handleToggleCollapse = async (id) => {
     const b = blocks.find(x => x.id === id);
     if (!b) return;
     const newMeta = { ...(b.meta || {}), collapsed: !(b.meta?.collapsed || false) };
     setBlocks(prev => prev.map(x => x.id === id ? { ...x, meta: newMeta } : x));
     await updateBlock(id, { meta: newMeta });
+    setActiveBlockMenu(null);
   };
 
+  // -- Delete --
   const handleDelete = async (id) => {
     if (blocks.length <= 1) return;
     await deleteBlock(id);
@@ -81,6 +125,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     await saveOrder(reordered);
   };
 
+  // -- Type change --
   const handleTypeChange = async (id, newType) => {
     setBlocks(prev => prev.map(b => b.id === id ? { ...b, type: newType } : b));
     await updateBlock(id, { type: newType });
@@ -88,6 +133,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     setActiveBlockMenu(null);
   };
 
+  // -- Indent --
   const handleIndent = async (id, delta) => {
     const b = blocks.find(x => x.id === id);
     if (!b) return;
@@ -96,40 +142,16 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     await updateBlock(id, { indent: newIndent });
   };
 
-  // 移动端上下移动排序
-  const handleMoveUp = async (idx) => {
-    if (idx <= 0) return;
-    const newBlocks = [...blocks];
-    [newBlocks[idx - 1], newBlocks[idx]] = [newBlocks[idx], newBlocks[idx - 1]];
-    const reordered = newBlocks.map((b, i) => ({ ...b, order: i }));
-    setBlocks(reordered);
-    setActiveBlockMenu(null);
-    await saveOrder(reordered);
-  };
-
-  const handleMoveDown = async (idx) => {
-    if (idx >= blocks.length - 1) return;
-    const newBlocks = [...blocks];
-    [newBlocks[idx], newBlocks[idx + 1]] = [newBlocks[idx + 1], newBlocks[idx]];
-    const reordered = newBlocks.map((b, i) => ({ ...b, order: i }));
-    setBlocks(reordered);
-    setActiveBlockMenu(null);
-    await saveOrder(reordered);
-  };
-
-  // 拖拽排序 (桌面端)
+  // -- Desktop drag --
   const handleDragStart = (e, id) => {
     setDragId(id);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', id);
-    // 设置拖拽图像为透明，避免浏览器默认拖拽图
     const ghost = document.createElement('div');
-    ghost.style.opacity = '0';
-    ghost.style.position = 'absolute';
-    ghost.style.top = '-1000px';
+    ghost.style.cssText = 'opacity:0;position:absolute;top:-2000px;left:-2000px;width:1px;height:1px';
     document.body.appendChild(ghost);
     e.dataTransfer.setDragImage(ghost, 0, 0);
-    setTimeout(() => document.body.removeChild(ghost), 0);
+    setTimeout(() => ghost.remove(), 0);
   };
 
   const handleDragOver = (e, id) => {
@@ -153,12 +175,160 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     await saveOrder(reordered);
   };
 
+  // -- Mobile touch drag --
+  const handleTouchStart = (e, visibleIdx) => {
+    if (!isMobile) return;
+    const touch = e.touches[0];
+    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
+    clearTimeout(longPressTimer.current);
+    longPressTimer.current = setTimeout(() => {
+      const vb = visibleBlocks[visibleIdx];
+      if (!vb) return;
+      setTouchDrag({
+        id: vb.block.id,
+        originalIdx: vb.originalIdx,
+        fromVisibleIdx: visibleIdx,
+        toVisibleIdx: visibleIdx,
+        y: touchStartPos.current.y,
+      });
+      if (navigator.vibrate) navigator.vibrate(10);
+    }, 350);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isMobile) return;
+    // Cancel long-press if finger moves too much
+    if (longPressTimer.current && touchStartPos.current) {
+      const t = e.touches[0];
+      if (Math.abs(t.clientX - touchStartPos.current.x) > 6 || Math.abs(t.clientY - touchStartPos.current.y) > 6) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+    }
+
+    if (!touchDrag) return;
+    e.preventDefault();
+
+    const touch = e.touches[0];
+    setTouchDrag(prev => ({ ...prev, y: touch.clientY }));
+
+    // Calculate target visible index based on finger position
+    const wrappers = editorRef.current?.querySelectorAll('.notion-block-wrapper');
+    if (!wrappers) return;
+    let target = touchDrag.fromVisibleIdx;
+    for (let i = 0; i < wrappers.length; i++) {
+      const rect = wrappers[i].getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      if (touch.clientY > midY && i > target) target = i;
+      if (touch.clientY < midY && i < target) target = i;
+    }
+    // Fine-tune: find nearest center
+    let nearest = target;
+    let nearestDist = Infinity;
+    for (let i = 0; i < wrappers.length; i++) {
+      const rect = wrappers[i].getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      const dist = Math.abs(touch.clientY - midY);
+      if (dist < nearestDist) { nearestDist = dist; nearest = i; }
+    }
+    if (nearest !== touchDrag.toVisibleIdx) {
+      setTouchDrag(prev => ({ ...prev, toVisibleIdx: nearest }));
+    }
+  };
+
+  const handleTouchEnd = () => {
+    clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
+
+    if (!touchDrag) return;
+    const { fromVisibleIdx, toVisibleIdx } = touchDrag;
+
+    if (fromVisibleIdx !== toVisibleIdx) {
+      const fromV = visibleBlocks[fromVisibleIdx];
+      const toV = visibleBlocks[toVisibleIdx];
+      if (fromV && toV) {
+        const newBlocks = [...blocks];
+        const [removed] = newBlocks.splice(fromV.originalIdx, 1);
+        // Adjust target after removal
+        const adjustedTarget = fromV.originalIdx < toV.originalIdx ? toV.originalIdx - 1 : toV.originalIdx;
+        newBlocks.splice(adjustedTarget, 0, removed);
+        const reordered = newBlocks.map((b, i) => ({ ...b, order: i }));
+        setBlocks(reordered);
+        saveOrder(reordered);
+      }
+    }
+    setTouchDrag(null);
+    touchStartPos.current = null;
+  };
+
+  // -- Keyboard --
+  const handleKeyDown = (e, id) => {
+    const idx = blocks.findIndex(b => b.id === id);
+    const b = blocks[idx];
+    if (!b) return;
+
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      // Find visible index for this block
+      const vi = visibleBlocks.findIndex(v => v.block.id === id);
+      if (vi >= 0) {
+        handleAdd(vi, getInheritedType(b));
+      }
+    }
+
+    if (e.key === 'Backspace' && b.content === '' && blocks.length > 1) {
+      e.preventDefault();
+      const prev = idx > 0 ? blocks[idx - 1] : null;
+      handleDelete(id);
+      if (prev) setFocusId(prev.id);
+    }
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      handleIndent(id, e.shiftKey ? -1 : 1);
+    }
+  };
+
+  // -- Focus new block --
+  useEffect(() => {
+    if (focusId) {
+      const timer = setTimeout(() => {
+        const el = editorRef.current?.querySelector(`[data-block-id="${focusId}"] input`);
+        el?.focus();
+        setFocusId(null);
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [focusId]);
+
+  // -- Click outside closes menus --
+  useEffect(() => {
+    const click = (e) => {
+      if (editorRef.current && !editorRef.current.contains(e.target)) {
+        setConvertMenu(null);
+        setActiveBlockMenu(null);
+      }
+    };
+    document.addEventListener('click', click);
+    return () => document.removeEventListener('click', click);
+  }, []);
+
+  // -- Prevent scroll during touch drag --
+  useEffect(() => {
+    if (touchDrag) {
+      const prevent = (e) => e.preventDefault();
+      document.addEventListener('touchmove', prevent, { passive: false });
+      return () => document.removeEventListener('touchmove', prevent);
+    }
+  }, [touchDrag]);
+
+  // -- Render block content --
   const renderBlockContent = (b) => {
     const commonProps = {
       value: b.content,
       onChange: e => handleChange(b.id, e.target.value),
       onKeyDown: e => handleKeyDown(e, b.id),
-      className: `block-content ${b.type} ${b.meta?.checked ? 'done' : ''}`,
+      className: `block-content ${b.meta?.checked ? 'done' : ''}`,
       placeholder: getPlaceholder(b.type),
     };
 
@@ -175,7 +345,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
       case 'toggle':
         return (
           <div className="block-toggle-row">
-            <button className="toggle-btn-small" onClick={() => handleToggleCollapse(b.id)}>
+            <button className="toggle-btn-small" onClick={(e) => { e.stopPropagation(); handleToggleCollapse(b.id); }}>
               {b.meta?.collapsed ? '▶' : '▼'}
             </button>
             <input {...commonProps} />
@@ -189,10 +359,11 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
           </div>
         );
       case 'numbered_list': {
-        const idx = blocks.filter(x => x.type === 'numbered_list' && x.order <= b.order).length;
+        const listBlocks = blocks.filter(x => x.type === 'numbered_list');
+        const num = listBlocks.findIndex(x => x.id === b.id) + 1;
         return (
           <div className="block-list-row">
-            <span className="list-number">{idx}.</span>
+            <span className="list-number">{num}.</span>
             <input {...commonProps} />
           </div>
         );
@@ -202,146 +373,102 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     }
   };
 
-  const handleKeyDown = (e, id) => {
-    const idx = blocks.findIndex(b => b.id === id);
-    const b = blocks[idx];
-
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleAdd(idx);
-    }
-
-    if (e.key === 'Backspace' && b?.content === '' && blocks.length > 1) {
-      e.preventDefault();
-      const prev = blocks[idx - 1];
-      handleDelete(id);
-      if (prev) setFocusId(prev.id);
-    }
-
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      handleIndent(id, e.shiftKey ? -1 : 1);
-    }
-  };
-
-  useEffect(() => {
-    if (focusId) {
-      setTimeout(() => {
-        const el = editorRef.current?.querySelector(`[data-block-id="${focusId}"] input`);
-        el?.focus();
-        setFocusId(null);
-      }, 50);
-    }
-  }, [focusId]);
-
-  // 点击外部关闭菜单
-  useEffect(() => {
-    const click = (e) => {
-      if (editorRef.current && !editorRef.current.contains(e.target)) {
-        setConvertMenu(null);
-        setActiveBlockMenu(null);
-      }
-    };
-    document.addEventListener('click', click);
-    return () => document.removeEventListener('click', click);
-  }, []);
-
   const getPlaceholder = (type) => {
-    const map = {
-      text: "输入内容...",
-      heading: "标题",
-      todo: "待办事项",
-      toggle: "折叠列表",
-      bulleted_list: "列表项",
-      numbered_list: "列表项",
-    };
-    return map[type] || "输入内容...";
+    const map = { text: '输入内容...', heading: '标题', todo: '待办事项', toggle: '折叠列表', bulleted_list: '列表项', numbered_list: '列表项' };
+    return map[type] || '输入内容...';
   };
+
+  // -- Dragged block preview for mobile --
+  const draggedBlock = touchDrag ? blocks.find(b => b.id === touchDrag.id) : null;
 
   return (
-    <div className={`notion-editor ${isMobile ? 'mobile' : ''}`} ref={editorRef}>
-      {blocks.map((b, i) => (
-        <div key={b.id} className="notion-block-wrapper">
-          {/* Mobile: inline + separator between blocks */}
-          {isMobile && (
-            <div className="block-add-separator">
-              <button
-                className="block-add-inline"
-                onClick={() => handleAdd(i - 1)}
-                title="添加块"
-              >+</button>
-            </div>
-          )}
+    <div
+      className={`notion-editor${isMobile ? ' mobile' : ''}${touchDrag ? ' touch-dragging' : ''}`}
+      ref={editorRef}
+      onTouchMove={isMobile ? handleTouchMove : undefined}
+      onTouchEnd={isMobile ? handleTouchEnd : undefined}
+    >
+      {visibleBlocks.map((vb, vi) => {
+        const b = vb.block;
+        const isBeingDragged = touchDrag && touchDrag.id === b.id;
+        const showInsertMarker = touchDrag && touchDrag.toVisibleIdx === vi && touchDrag.fromVisibleIdx !== vi;
 
-          <div
-            className={`notion-block ${b.type} ${isMobile ? 'mobile' : ''} ${dragId === b.id ? 'dragging' : ''} ${dragOverId === b.id ? 'drag-over' : ''}`}
-            style={{ paddingLeft: `${(b.indent || 0) * 24 + 8}px` }}
-            draggable={!isMobile}
-            onDragStart={isMobile ? undefined : e => handleDragStart(e, b.id)}
-            onDragOver={isMobile ? undefined : e => handleDragOver(e, b.id)}
-            onDrop={isMobile ? undefined : e => handleDrop(e, b.id)}
-            onDragEnd={isMobile ? undefined : () => { setDragId(null); setDragOverId(null); }}
-            onMouseEnter={isMobile ? undefined : () => setHoverId(b.id)}
-            onMouseLeave={isMobile ? undefined : () => setHoverId(null)}
-            data-block-id={b.id}
-          >
-            {/* Desktop: left-side block actions */}
-            {!isMobile && (
-              <div className={`block-actions ${hoverId === b.id ? 'visible' : ''}`}>
-                <button className="block-add" title="下方添加" onClick={(e) => { e.stopPropagation(); handleAdd(i); }}>+</button>
-                <button
-                  className="block-handle"
-                  title="拖拽排序 / 转换类型"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setConvertMenu({ x: rect.left, y: rect.bottom + 4, blockId: b.id });
-                  }}
-                >⋮⋮</button>
-              </div>
+        return (
+          <div key={b.id} className="notion-block-wrapper" style={{ position: 'relative' }}>
+            {/* Insert marker before this block */}
+            {showInsertMarker && touchDrag.fromVisibleIdx > vi && (
+              <div className="touch-drop-indicator" />
             )}
 
-            {renderBlockContent(b)}
+            <div
+              className={`notion-block ${b.type}${isMobile ? ' mobile' : ''}${dragId === b.id ? ' dragging' : ''}${dragOverId === b.id ? ' drag-over' : ''}${isBeingDragged ? ' touch-dragging-block' : ''}`}
+              style={{ paddingLeft: `${(b.indent || 0) * 24 + (isMobile ? 16 : 52)}px` }}
+              draggable={!isMobile}
+              onDragStart={!isMobile ? e => handleDragStart(e, b.id) : undefined}
+              onDragOver={!isMobile ? e => handleDragOver(e, b.id) : undefined}
+              onDrop={!isMobile ? e => handleDrop(e, b.id) : undefined}
+              onDragEnd={!isMobile ? () => { setDragId(null); setDragOverId(null); } : undefined}
+              onMouseEnter={!isMobile ? () => setHoverId(b.id) : undefined}
+              onMouseLeave={!isMobile ? () => setHoverId(null) : undefined}
+              onTouchStart={isMobile ? (e) => handleTouchStart(e, vi) : undefined}
+              data-block-id={b.id}
+            >
+              {/* Desktop: left-side buttons */}
+              {!isMobile && (
+                <div className={`block-actions${hoverId === b.id ? ' visible' : ''}`}>
+                  <button className="block-add" onClick={e => { e.stopPropagation(); handleAdd(vi); }}>+</button>
+                  <button className="block-handle" onClick={e => {
+                    e.stopPropagation();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setConvertMenu({ x: Math.min(rect.left, window.innerWidth - 200), y: rect.bottom + 4, blockId: b.id });
+                  }}>⋮⋮</button>
+                </div>
+              )}
 
-            {/* Mobile: right-side action button */}
-            {isMobile && (
-              <button
-                className="block-mobile-menu-btn"
-                onClick={(e) => {
+              {renderBlockContent(b)}
+
+              {/* Mobile: right menu button */}
+              {isMobile && (
+                <button className="block-mobile-menu-btn" onClick={e => {
                   e.stopPropagation();
                   setActiveBlockMenu(activeBlockMenu === b.id ? null : b.id);
                   setConvertMenu(null);
-                }}
-              >⋮</button>
+                }}>⋮</button>
+              )}
+            </div>
+
+            {/* Insert marker after this block */}
+            {showInsertMarker && touchDrag.fromVisibleIdx < vi && (
+              <div className="touch-drop-indicator" />
+            )}
+
+            {/* Mobile: per-block dropdown menu */}
+            {isMobile && activeBlockMenu === b.id && (
+              <div className="block-mobile-menu">
+                <button onClick={() => { handleAdd(vi); setActiveBlockMenu(null); }}>+ 在下方添加</button>
+                <button onClick={() => { setConvertMenu({ blockId: b.id, mobile: true }); setActiveBlockMenu(null); }}>⇄ 转换类型</button>
+                <button onClick={() => handleToggleCollapse(b.id)} disabled={b.type !== 'toggle'}>
+                  {b.meta?.collapsed ? '▶ 展开' : '▼ 折叠'}
+                </button>
+                <button onClick={() => handleIndent(b.id, 1)}>→ 增加缩进</button>
+                <button onClick={() => handleIndent(b.id, -1)} disabled={(b.indent || 0) === 0}>← 减少缩进</button>
+                <button onClick={() => { handleDelete(b.id); setActiveBlockMenu(null); }}
+                  style={{ color: 'var(--danger)' }} disabled={blocks.length <= 1}>✕ 删除</button>
+              </div>
             )}
           </div>
+        );
+      })}
 
-          {/* Mobile: dropdown menu for this block */}
-          {isMobile && activeBlockMenu === b.id && (
-            <div className="block-mobile-menu">
-              <button onClick={() => handleAdd(i)}>+ 下方添加</button>
-              <button onClick={() => { setConvertMenu({ blockId: b.id, mobile: true }); setActiveBlockMenu(null); }}>⇄ 转换类型</button>
-              <button onClick={() => handleMoveUp(i)} disabled={i === 0}>↑ 上移</button>
-              <button onClick={() => handleMoveDown(i)} disabled={i >= blocks.length - 1}>↓ 下移</button>
-              <button onClick={() => handleIndent(b.id, 1)}>→ 增加缩进</button>
-              <button onClick={() => handleIndent(b.id, -1)}>← 减少缩进</button>
-              <button onClick={() => { handleDelete(b.id); setActiveBlockMenu(null); }}
-                style={{ color: 'var(--danger)' }}
-                disabled={blocks.length <= 1}
-              >✕ 删除</button>
-            </div>
-          )}
-        </div>
-      ))}
+      {/* Insert marker at very end */}
+      {touchDrag && touchDrag.toVisibleIdx >= visibleBlocks.length && (
+        <div className="touch-drop-indicator" />
+      )}
 
-      {/* Mobile: + separator at the very bottom for adding after last block */}
+      {/* Mobile: bottom add button */}
       {isMobile && blocks.length > 0 && (
-        <div className="block-add-separator">
-          <button
-            className="block-add-inline"
-            onClick={() => handleAdd(blocks.length - 1)}
-            title="末尾添加"
-          >+</button>
+        <div className="block-add-bottom-bar">
+          <button onClick={() => handleAdd(visibleBlocks.length - 1)}>+ 添加块</button>
         </div>
       )}
 
@@ -357,7 +484,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
         </div>
       )}
 
-      {/* Mobile: convert type bottom sheet */}
+      {/* Mobile: convert bottom sheet */}
       {convertMenu && convertMenu.mobile && (
         <>
           <div className="mobile-sheet-overlay" onClick={() => setConvertMenu(null)} />
@@ -372,6 +499,18 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
             <button className="mobile-sheet-cancel" onClick={() => setConvertMenu(null)}>取消</button>
           </div>
         </>
+      )}
+
+      {/* Touch drag: floating preview */}
+      {touchDrag && draggedBlock && (
+        <div
+          className="touch-drag-preview"
+          style={{ top: touchDrag.y - 20 }}
+        >
+          <div className="touch-drag-preview-inner">
+            {renderBlockContent(draggedBlock)}
+          </div>
+        </div>
       )}
     </div>
   );
