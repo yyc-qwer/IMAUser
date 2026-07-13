@@ -8,6 +8,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
   const [focusId, setFocusId] = useState(null);
   const [convertMenu, setConvertMenu] = useState(null);
   const [activeBlockMenu, setActiveBlockMenu] = useState(null);
+  const [slashMenu, setSlashMenu] = useState(null); // { blockId, query, rect } or null
 
   // -- Desktop drag --
   const [dragId, setDragId] = useState(null);
@@ -64,6 +65,55 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     return result;
   }, [blocks]);
 
+  // -- Helper: get number prefix for numbered_list block --
+  const getNumberPrefix = useCallback((blockId) => {
+    const idx = blocks.findIndex(b => b.id === blockId);
+    if (idx < 0) return '1.';
+    let count = 0;
+    const targetIndent = blocks[idx].indent || 0;
+    for (let i = idx; i >= 0; i--) {
+      if (blocks[i].type === 'numbered_list' && (blocks[i].indent || 0) === targetIndent) {
+        count++;
+      } else if ((blocks[i].indent || 0) < targetIndent) {
+        break;
+      }
+    }
+    return `${count}.`;
+  }, [blocks]);
+
+  // -- Helper: detect markdown pattern at start of content --
+  const detectMarkdown = useCallback((content) => {
+    const patterns = [
+      { prefix: '### ', type: 'heading', strip: 4 },
+      { prefix: '## ',  type: 'heading', strip: 3 },
+      { prefix: '# ',  type: 'heading', strip: 2 },
+      { prefix: '- ',  type: 'bulleted_list', strip: 2 },
+      { prefix: '* ',  type: 'bulleted_list', strip: 2 },
+      { prefix: '[] ', type: 'todo', strip: 3 },
+      { prefix: '[ ] ', type: 'todo', strip: 4 },
+      { prefix: '> ',  type: 'toggle', strip: 2 },
+      { prefix: '1. ', type: 'numbered_list', strip: 3 },
+    ];
+    for (const p of patterns) {
+      if (content.startsWith(p.prefix)) {
+        return { type: p.type, content: content.slice(p.strip) };
+      }
+    }
+    return null;
+  }, []);
+
+  // -- Slash command options --
+  const SLASH_COMMANDS = [
+    { type: 'text', icon: '📝', label: '文本', desc: '普通文本块' },
+    { type: 'heading', icon: '#', label: '标题', desc: '大号标题文字' },
+    { type: 'todo', icon: '☑️', label: '待办', desc: '带复选框的待办项' },
+    { type: 'bulleted_list', icon: '•', label: '无序列表', desc: '项目符号列表' },
+    { type: 'numbered_list', icon: '1.', label: '编号列表', desc: '有序编号列表' },
+    { type: 'toggle', icon: '▶', label: '折叠列表', desc: '可展开的折叠内容' },
+    { type: 'quote', icon: '❝', label: '引用', desc: '引用文本块' },
+    { type: 'divider', icon: '—', label: '分隔线', desc: '视觉分隔线' },
+  ];
+
   // -- Load --
   const load = useCallback(async () => {
     if (loadedRef.current) return;
@@ -93,7 +143,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
   // -- Inherit type --
   const getInheritedType = (parentBlock) => {
     if (!parentBlock) return 'text';
-    if (['bulleted_list', 'todo'].includes(parentBlock.type)) return parentBlock.type;
+    if (['bulleted_list', 'numbered_list', 'todo'].includes(parentBlock.type)) return parentBlock.type;
     return 'text';
   };
 
@@ -137,9 +187,57 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     setFocusId(b.id);
   };
 
-  // -- Change content --
+  // -- Change content (with markdown detection & slash menu) --
   const handleChange = async (id, content) => {
-    setBlocks(prev => prev.map(b => b.id === id ? { ...b, content } : b));
+    // Slash menu detection: if block is text and content is just "/", show menu
+    const b = blocks.find(x => x.id === id);
+    if (b && content === '/' && b.type === 'text') {
+      const el = editorRef.current?.querySelector(`[data-block-id="${id}"]`);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        setSlashMenu({ blockId: id, query: '', rect });
+      }
+      setBlocks(prev => prev.map(x => x.id === id ? { ...x, content: '/' } : x));
+      return;
+    }
+    // If slash menu is open for this block, update query
+    if (slashMenu && slashMenu.blockId === id) {
+      const query = content.startsWith('/') ? content.slice(1) : content;
+      setSlashMenu(prev => prev ? { ...prev, query } : null);
+      if (!content.startsWith('/')) {
+        // User deleted the slash, close menu
+        setSlashMenu(null);
+      }
+    }
+
+    // Markdown pattern detection (only for text blocks)
+    if (b && b.type === 'text' && content.length >= 2) {
+      const md = detectMarkdown(content);
+      if (md) {
+        // Convert type and strip prefix
+        setBlocks(prev => prev.map(x => x.id === id ? { ...x, type: md.type, content: md.content } : x));
+        await updateBlock(id, { type: md.type, content: md.content });
+        // If converting to toggle, auto-create child
+        if (md.type === 'toggle') {
+          const idx = blocks.findIndex(x => x.id === id);
+          const childIndent = (b.indent || 0) + 1;
+          const child = await addBlock(taskId, 'text', '', idx + 1, childIndent);
+          if (child) {
+            setBlocks(prev => {
+              const newBlocks = [...prev];
+              newBlocks.splice(idx + 1, 0, child);
+              return newBlocks.map((blk, i) => ({ ...blk, order: i }));
+            });
+            await saveOrder(
+              [...blocks.slice(0, idx + 1), child, ...blocks.slice(idx + 1)].map((blk, i) => ({ ...blk, order: i }))
+            );
+          }
+        }
+        return;
+      }
+    }
+
+    setBlocks(prev => prev.map(x => x.id === id ? { ...x, content } : x));
     await updateBlock(id, { content });
   };
 
@@ -170,6 +268,50 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     const reordered = newBlocks.map((b, i) => ({ ...b, order: i }));
     setBlocks(reordered);
     await saveOrder(reordered);
+  };
+
+  // -- Slash menu select --
+  const handleSlashSelect = async (type) => {
+    if (!slashMenu) return;
+    const { blockId } = slashMenu;
+    const idx = blocks.findIndex(b => b.id === blockId);
+    if (idx < 0) { setSlashMenu(null); return; }
+
+    // Divider: special handling (no content, just visual)
+    if (type === 'divider') {
+      setBlocks(prev => prev.map(x => x.id === blockId ? { ...x, type: 'divider', content: '' } : x));
+      await updateBlock(blockId, { type: 'divider', content: '' });
+      setSlashMenu(null);
+      return;
+    }
+
+    // Normal conversion: clear slash content
+    setBlocks(prev => prev.map(x => x.id === blockId ? { ...x, type, content: '' } : x));
+    await updateBlock(blockId, { type, content: '' });
+
+    // If converting to toggle, auto-create child
+    if (type === 'toggle') {
+      const b = blocks[idx];
+      const childIndent = (b.indent || 0) + 1;
+      const child = await addBlock(taskId, 'text', '', idx + 1, childIndent);
+      if (child) {
+        setBlocks(prev => {
+          const newBlocks = [...prev];
+          newBlocks.splice(idx + 1, 0, child);
+          return newBlocks.map((blk, i) => ({ ...blk, order: i }));
+        });
+        await saveOrder(
+          [...blocks.slice(0, idx + 1), child, ...blocks.slice(idx + 1)].map((blk, i) => ({ ...blk, order: i }))
+        );
+      }
+    }
+
+    setSlashMenu(null);
+    // Focus the input after conversion
+    setTimeout(() => {
+      const el = editorRef.current?.querySelector(`[data-block-id="${blockId}"] input`);
+      el?.focus();
+    }, 50);
   };
 
   // -- Type change --
@@ -423,6 +565,34 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     const b = blocks[idx];
     if (!b) return;
 
+    // Slash menu keyboard handling
+    if (slashMenu && slashMenu.blockId === id) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setSlashMenu(null);
+        // Clear the "/" content
+        setBlocks(prev => prev.map(x => x.id === id ? { ...x, content: '' } : x));
+        await updateBlock(id, { content: '' });
+        return;
+      }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        // TODO: keyboard navigation in slash menu
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const filtered = SLASH_COMMANDS.filter(c =>
+          !slashMenu.query || c.label.includes(slashMenu.query) || c.type.includes(slashMenu.query)
+        );
+        if (filtered.length > 0) {
+          handleSlashSelect(filtered[0].type);
+        }
+        return;
+      }
+      return; // Don't process other keys while slash menu is open
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
 
@@ -489,13 +659,13 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
 
   // -- Click on editor (not on menus) closes menus --
   const handleEditorClick = (e) => {
-    // Don't close menus if clicking on a menu item or menu toggle button
     const target = e.target;
     if (target.closest('.convert-menu') || target.closest('.mobile-sheet') ||
         target.closest('.block-mobile-menu') || target.closest('.mobile-sheet-overlay') ||
-        target.closest('.block-actions')) return;
+        target.closest('.block-actions') || target.closest('.slash-menu')) return;
     setConvertMenu(null);
     setActiveBlockMenu(null);
+    setSlashMenu(null);
   };
 
   // -- Click outside closes menus --
@@ -504,6 +674,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
       if (editorRef.current && !editorRef.current.contains(e.target)) {
         setConvertMenu(null);
         setActiveBlockMenu(null);
+        setSlashMenu(null);
       }
     };
     document.addEventListener('pointerdown', click);
@@ -561,13 +732,28 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
             <input {...commonProps} />
           </div>
         );
+      case 'numbered_list':
+        return (
+          <div className="block-list-row">
+            <span className="list-number">{getNumberPrefix(b.id)}</span>
+            <input {...commonProps} />
+          </div>
+        );
+      case 'quote':
+        return (
+          <div className="block-quote-row">
+            <input {...commonProps} style={{ fontStyle: 'italic' }} />
+          </div>
+        );
+      case 'divider':
+        return <div className="block-divider"><hr /></div>;
       default:
         return <input {...commonProps} />;
     }
   };
 
   const getPlaceholder = (type) => {
-    const map = { text: '输入内容...', heading: '标题', todo: '待办事项', toggle: '折叠列表', bulleted_list: '列表项' };
+    const map = { text: '输入内容，或输入 / 选择块类型...', heading: '标题', todo: '待办事项', toggle: '折叠列表', bulleted_list: '列表项', numbered_list: '编号列表项', quote: '引用内容' };
     return map[type] || '输入内容...';
   };
 
@@ -668,7 +854,10 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
           <div className="convert-item" onClick={() => handleTypeChange(convertMenu.blockId, 'heading')}># 标题</div>
           <div className="convert-item" onClick={() => handleTypeChange(convertMenu.blockId, 'todo')}>☑️ 待办</div>
           <div className="convert-item" onClick={() => handleTypeChange(convertMenu.blockId, 'bulleted_list')}>• 无序列表</div>
+          <div className="convert-item" onClick={() => handleTypeChange(convertMenu.blockId, 'numbered_list')}>1. 编号列表</div>
           <div className="convert-item" onClick={() => handleTypeChange(convertMenu.blockId, 'toggle')}>▼ 折叠列表</div>
+          <div className="convert-item" onClick={() => handleTypeChange(convertMenu.blockId, 'quote')}>❝ 引用</div>
+          <div className="convert-item" onClick={() => handleTypeChange(convertMenu.blockId, 'divider')}>— 分隔线</div>
         </div>
       )}
 
@@ -682,7 +871,10 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
             <button onClick={() => handleTypeChange(convertMenu.blockId, 'heading')}># 标题</button>
             <button onClick={() => handleTypeChange(convertMenu.blockId, 'todo')}>☑️ 待办</button>
             <button onClick={() => handleTypeChange(convertMenu.blockId, 'bulleted_list')}>• 无序列表</button>
+            <button onClick={() => handleTypeChange(convertMenu.blockId, 'numbered_list')}>1. 编号列表</button>
             <button onClick={() => handleTypeChange(convertMenu.blockId, 'toggle')}>▼ 折叠列表</button>
+            <button onClick={() => handleTypeChange(convertMenu.blockId, 'quote')}>❝ 引用</button>
+            <button onClick={() => handleTypeChange(convertMenu.blockId, 'divider')}>— 分隔线</button>
             <button className="mobile-sheet-cancel" onClick={() => { setConvertMenu(null); setActiveBlockMenu(null); }}>取消</button>
           </div>
         </>
@@ -697,6 +889,38 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
           <div className="touch-drag-preview-inner">
             {renderBlockContent(draggedBlock)}
           </div>
+        </div>
+      )}
+
+      {/* Slash command menu */}
+      {slashMenu && (
+        <div
+          className="slash-menu"
+          style={{
+            left: `${slashMenu.rect.left}px`,
+            top: `${slashMenu.rect.bottom + 4}px`,
+          }}
+        >
+          {SLASH_COMMANDS.filter(c =>
+            !slashMenu.query || c.label.includes(slashMenu.query) || c.type.includes(slashMenu.query)
+          ).map(cmd => (
+            <div
+              key={cmd.type}
+              className="slash-item"
+              onClick={() => handleSlashSelect(cmd.type)}
+            >
+              <span className="slash-icon">{cmd.icon}</span>
+              <div className="slash-info">
+                <span className="slash-label">{cmd.label}</span>
+                <span className="slash-desc">{cmd.desc}</span>
+              </div>
+            </div>
+          ))}
+          {SLASH_COMMANDS.filter(c =>
+            !slashMenu.query || c.label.includes(slashMenu.query) || c.type.includes(slashMenu.query)
+          ).length === 0 && (
+            <div className="slash-item slash-no-results">无匹配结果</div>
+          )}
         </div>
       )}
     </div>

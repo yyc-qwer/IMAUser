@@ -3,6 +3,7 @@ import { Routes, Route, NavLink, useNavigate, useLocation } from "react-router-d
 import { useTasks, isNotificationEnabled, setNotificationEnabled, requestNotificationPermission } from "./hooks/useTasks";
 import { useAuth } from "./hooks/useAuth";
 import { useMediaQuery } from "./hooks/useMediaQuery";
+import useSettings, { sendPushPlus } from "./hooks/useSettings";
 import AIChat from "./components/AIChat";
 import SplashScreen from "./components/SplashScreen";
 import Skeleton from "./components/Skeleton";
@@ -26,6 +27,8 @@ function App() {
     getWeeklyStats,
   } = useTasks();
 
+  const { pushplusToken, setPushplusToken } = useSettings(user);
+
   const navigate = useNavigate();
   const location = useLocation();
   const currentView = location.pathname.slice(1) || "tasks";
@@ -46,7 +49,7 @@ function App() {
     priority: "medium", reminderAt: "", repeatRule: "none", source: "manual"
   });
 
-  // 任务到期提醒检查
+  // 任务到期提醒检查（浏览器通知 + 微信推送）
   useEffect(() => {
     if (!notifEnabled || Notification.permission !== 'granted') return;
 
@@ -63,10 +66,19 @@ function App() {
         if (end <= tomorrow && end > now) {
           const key = `${t.id}_${new Date().toISOString().slice(0, 10)}`;
           if (!notified[key]) {
+            // 浏览器通知
             new Notification('任务即将到期', {
               body: `「${t.title}」将于 ${t.endDate} 截止，请尽快处理`,
               icon: '/favicon.ico'
             });
+            // 微信推送（如果已配置）
+            if (pushplusToken) {
+              sendPushPlus(
+                pushplusToken,
+                '任务即将到期',
+                `<b>「${t.title}」</b><br/>截止日期：${t.endDate}<br/>请尽快处理 ⏰`
+              ).catch(() => {}); // 静默失败，不影响浏览器通知
+            }
             notified[key] = true;
           }
         }
@@ -84,7 +96,7 @@ function App() {
     checkDeadlines(); // 立即检查一次
     const id = setInterval(checkDeadlines, 5 * 60 * 1000); // 每5分钟
     return () => clearInterval(id);
-  }, [notifEnabled, activeTasks]);
+  }, [notifEnabled, activeTasks, pushplusToken]);
 
   // Apply theme to document root
   useEffect(() => {
@@ -369,6 +381,34 @@ function App() {
               </span>
               <div className="theme-switch" />
             </div>
+            <div className="settings-item settings-pushplus">
+              <span className="settings-item-label">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                微信提醒
+              </span>
+              <span className="pushplus-hint">
+                {pushplusToken ? '已配置 ✓' : '未配置'}
+              </span>
+            </div>
+            {settingsOpen && (
+              <div className="settings-pushplus-input" onClick={e => e.stopPropagation()}>
+                <input
+                  type="text"
+                  className="pushplus-token-input"
+                  placeholder="粘贴 PushPlus Token..."
+                  value={pushplusToken}
+                  onChange={e => setPushplusToken(e.target.value.trim())}
+                />
+                {pushplusToken && (
+                  <button className="pushplus-clear-btn" onClick={() => setPushplusToken('')} title="清除">✕</button>
+                )}
+                <div className="pushplus-help">
+                  获取 Token：访问 <a href="https://www.pushplus.plus" target="_blank" rel="noopener noreferrer">pushplus.plus</a> → 登录 → 一对一推送
+                </div>
+              </div>
+            )}
             <div className="settings-divider" />
             <div className="settings-logout" onClick={() => { setSettingsOpen(false); signOut(); }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -401,6 +441,7 @@ function App() {
               addTaskType={addTaskType} deleteTaskType={deleteTaskType} refresh={refresh}
               getSubtasks={getSubtasks} addSubtask={addSubtask} toggleSubtask={toggleSubtask} deleteSubtask={deleteSubtask}
               openNew={openNew} openEdit={openEdit} getTypeName={getTypeName} getTypeColor={getTypeColor}
+              pushplusToken={pushplusToken}
             />
           } />
           <Route path="/analytics" element={
@@ -414,8 +455,14 @@ function App() {
             />
           } />
           <Route path="/pomodoro" element={<PomodoroPage />} />
-          <Route path="/task/:taskId" element={<TaskDetailWrapper tasks={tasks} isMobile={isMobile} />} />
-          <Route path="/schedule" element={<ScheduleView />} />
+          <Route path="/task/:taskId" element={<TaskDetailWrapper tasks={tasks} isMobile={isMobile} pushplusToken={pushplusToken} />} />
+          <Route path="/schedule" element={
+            <ScheduleView
+              tasks={tasks} taskTypes={taskTypes}
+              addTask={addTask} addTaskType={addTaskType}
+              refresh={refresh} getTypeName={getTypeName} getTypeColor={getTypeColor}
+            />
+          } />
           <Route path="/import" element={<ImportPage tasks={tasks} taskTypes={taskTypes} addTask={addTask} getTypeName={getTypeName} handleImport={handleImport} handleStoragePull={handleStoragePull} />} />
           <Route path="/chat" element={<AIChat tasks={tasks} taskTypes={taskTypes} addTask={addTask} updateTask={updateTask} deleteTask={deleteTask} toggleComplete={toggleComplete} refresh={refresh} />} />
         </Routes>

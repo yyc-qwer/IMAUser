@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatCountdown, fmtDate } from "../utils/dateUtils";
+import { sendPushPlus } from "../hooks/useSettings";
 import PlusMenu from "./PlusMenu";
 import TimelineMemoView from "./TimelineMemoView";
 import MonthView from "./MonthView";
@@ -13,6 +14,7 @@ export default function TasksPage({
   addTaskType, deleteTaskType, refresh,
   getSubtasks, addSubtask, toggleSubtask, deleteSubtask,
   openNew, openEdit, getTypeName, getTypeColor,
+  pushplusToken,
 }) {
   const navigate = useNavigate();
   const [taskViewMode, setTaskViewMode] = useState("list");
@@ -127,6 +129,7 @@ export default function TasksPage({
                   onToggle={() => toggleComplete(t.id)} onEdit={() => openEdit(t)} onDelete={() => deleteTask(t.id)}
                   onExpand={() => setExpandedTask(expandedTask === t.id ? null : t.id)}
                   onOpenDetail={() => navigate("/task/" + t.id)}
+                  pushplusToken={pushplusToken}
                   subtaskProps={{ getSubtasks, addSubtask, toggleSubtask, deleteSubtask }} />
               ))}
             </div>
@@ -143,6 +146,7 @@ export default function TasksPage({
                   onToggle={() => toggleComplete(t.id)} onEdit={() => openEdit(t)} onDelete={() => deleteTask(t.id)}
                   onExpand={() => setExpandedTask(expandedTask === t.id ? null : t.id)}
                   onOpenDetail={() => navigate("/task/" + t.id)}
+                  pushplusToken={pushplusToken}
                   subtaskProps={{ getSubtasks, addSubtask, toggleSubtask, deleteSubtask }} />
               ))}
             </div>
@@ -195,11 +199,31 @@ export default function TasksPage({
   );
 }
 
-function TaskCard({ task, typeName, color, done, onToggle, onEdit, onDelete, onExpand, onOpenDetail, expanded, subtaskProps }) {
+function TaskCard({ task, typeName, color, done, onToggle, onEdit, onDelete, onExpand, onOpenDetail, expanded, pushplusToken, subtaskProps }) {
   const cd = formatCountdown(task);
   const priorityLabel = { high: "高", medium: "中", low: "低" }[task.priority || "medium"];
   const priorityColor = { high: "#d9544f", medium: "#d4855e", low: "#5b9bd5" }[task.priority || "medium"];
   const repeatLabel = { daily: "每天", weekly: "每周", none: "" }[task.repeatRule || "none"];
+  const [pushState, setPushState] = useState(null); // null | 'sending' | 'ok' | 'err'
+
+  const handlePush = async (e) => {
+    e.stopPropagation();
+    if (!pushplusToken || pushState === 'sending') return;
+    setPushState('sending');
+    try {
+      await sendPushPlus(pushplusToken, task.title,
+        `<b>${task.title}</b><br/>`
+        + (task.endDate ? `截止：${task.endDate}<br/>` : '')
+        + (task.startDate ? `开始：${task.startDate}<br/>` : '')
+        + '<br/><small>来自 IMAUser</small>'
+      );
+      setPushState('ok');
+      setTimeout(() => setPushState(null), 2000);
+    } catch {
+      setPushState('err');
+      setTimeout(() => setPushState(null), 2500);
+    }
+  };
 
   return (
     <div className={`task-card${done ? " done" : ""}`} style={{ borderLeftColor: done ? undefined : color }}>
@@ -210,6 +234,11 @@ function TaskCard({ task, typeName, color, done, onToggle, onEdit, onDelete, onE
           {repeatLabel && <span className="task-repeat-badge">{repeatLabel}</span>}
         </div>
         <div className="task-actions">
+          {pushplusToken && !done && (
+            <button className={`btn-icon-sm push-card-btn ${pushState || ''}`} onClick={handlePush} title="推送到微信">
+              {pushState === 'sending' ? '⏳' : pushState === 'ok' ? '✓' : pushState === 'err' ? '✕' : '📱'}
+            </button>
+          )}
           <button className="btn-icon-sm" onClick={onEdit} title="编辑">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>

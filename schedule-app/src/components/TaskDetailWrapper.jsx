@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import TaskDetailPage from "./TaskDetailPage";
 
-export default function TaskDetailWrapper({ tasks, isMobile }) {
+export default function TaskDetailWrapper({ tasks, isMobile, pushplusToken }) {
   const { taskId } = useParams();
   const navigate = useNavigate();
   const task = tasks.find(t => t.id === taskId);
@@ -19,6 +19,7 @@ export default function TaskDetailWrapper({ tasks, isMobile }) {
     <TaskDetailPage
       task={task}
       isMobile={isMobile}
+      pushplusToken={pushplusToken}
       onBack={() => navigate("/")}
     />
   );

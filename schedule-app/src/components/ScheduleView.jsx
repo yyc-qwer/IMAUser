@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
 const STORAGE_KEY = "imau_schedule_data";
+const SEMESTER_KEY = "imau_semester_start";
 
 const DEFAULT_PERIODS = [
   { id: 0, name: "第1节", start: "08:00", end: "08:45" },
@@ -108,14 +109,126 @@ function saveSchedule(data) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
-export default function ScheduleView() {
+export default function ScheduleView({ tasks = [], taskTypes = [], addTask, addTaskType, refresh, getTypeName, getTypeColor }) {
   const [schedule, setSchedule] = useState(loadSchedule);
   const [showSettings, setShowSettings] = useState(false);
   const [editingCell, setEditingCell] = useState(null); // { day, period }
   const [importStatus, setImportStatus] = useState(null);
+  const [syncStatus, setSyncStatus] = useState(null); // { type, msg }
+  const [syncing, setSyncing] = useState(false);
   const fileInputRef = useRef(null);
 
+  // 学期起始日期，持久化到 localStorage
+  const [semesterStart, setSemesterStart] = useState(() => {
+    try { return localStorage.getItem(SEMESTER_KEY) || ""; }
+    catch { return ""; }
+  });
+
+  const saveSemester = (val) => {
+    setSemesterStart(val);
+    localStorage.setItem(SEMESTER_KEY, val);
+  };
+
   useEffect(() => { saveSchedule(schedule); }, [schedule]);
+
+  // ===== 课表同步到任务列表 =====
+  const syncToTasks = async () => {
+    if (!addTask) return;
+
+    const courses = Object.entries(schedule.courses);
+    if (courses.length === 0) {
+      setSyncStatus({ type: "error", msg: "课表为空，请先导入或添加课程" });
+      return;
+    }
+
+    if (!semesterStart) {
+      setSyncStatus({ type: "error", msg: "请先在上方设置学期起始日期" });
+      return;
+    }
+
+    setSyncing(true);
+    setSyncStatus(null);
+
+    try {
+      // 确保有"课程"分类
+      let courseType = taskTypes.find(t => t.name === "课程");
+      if (!courseType && addTaskType) {
+        await addTaskType({ name: "课程", color: "#3d7a5c" });
+      }
+      // 重新获取类型（addTaskType 后需要 refresh 才能拿到，这里用本地缓存）
+      courseType = taskTypes.find(t => t.name === "课程");
+
+      const semesterDate = new Date(semesterStart);
+      let created = 0;
+      let skipped = 0;
+
+      for (const [key, course] of courses) {
+        if (!course?.name) continue;
+
+        // 检查去重：同名 + source="schedule" 且未完成的任务
+        const exists = tasks.some(t =>
+          t.title === course.name && t.source === "schedule" && !t.completed
+        );
+        if (exists) { skipped++; continue; }
+
+        const [dayStr, periodStr] = key.split("-");
+        const dayIndex = parseInt(dayStr, 10); // 0=周一, 6=周日
+
+        // 计算日期
+        let startDate = "", endDate = "";
+        let weekStart = 1, weekEnd = 18;
+        if (course.weekRange) {
+          const m = course.weekRange.match(/(\d+)\s*[-~至]\s*(\d+)/);
+          if (m) { weekStart = parseInt(m[1]); weekEnd = parseInt(m[2]); }
+          else {
+            const single = parseInt(course.weekRange);
+            if (!isNaN(single)) { weekStart = weekEnd = single; }
+          }
+        }
+
+        const calcDate = (weekNum) => {
+          const d = new Date(semesterDate);
+          d.setDate(d.getDate() + (weekNum - 1) * 7 + dayIndex);
+          return d.toISOString().slice(0, 10);
+        };
+
+        startDate = calcDate(weekStart);
+        endDate = calcDate(weekEnd);
+
+        // 收集备注
+        const notes = [
+          course.location && `地点: ${course.location}`,
+          course.teacher && `教师: ${course.teacher}`,
+          course.weekRange && `周次: ${course.weekRange}`,
+          course.classType && `类型: ${course.classType}`,
+        ].filter(Boolean).join("\n");
+
+        const taskData = {
+          title: course.name,
+          typeId: courseType?.id || null,
+          startDate,
+          endDate,
+          notes,
+          priority: "medium",
+          source: "schedule",
+          repeatRule: "weekly",
+        };
+
+        const resultId = await addTask(taskData);
+        if (resultId) created++;
+      }
+
+      if (refresh) await refresh();
+      setSyncStatus({
+        type: "success",
+        msg: `同步完成！新建 ${created} 个任务，跳过 ${skipped} 个已有任务`,
+      });
+    } catch (err) {
+      setSyncStatus({ type: "error", msg: `同步失败: ${err.message}` });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   // ===== 设置：修改节次时间 =====
   const updatePeriod = (id, field, value) => {
@@ -269,6 +382,10 @@ export default function ScheduleView() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             导入 CSV
           </button>
+          <button className="btn-primary btn-sm" onClick={syncToTasks} disabled={syncing}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+            {syncing ? "同步中..." : "同步到任务"}
+          </button>
           <button className="btn-secondary btn-sm" onClick={() => setShowSettings(s => !s)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/></svg>
             {showSettings ? "收起设置" : "课节设置"}
@@ -287,9 +404,27 @@ export default function ScheduleView() {
         </div>
       )}
 
+      {syncStatus && (
+        <div className={`schedule-import-status ${syncStatus.type}`} onClick={() => setSyncStatus(null)}>
+          {syncStatus.msg}
+        </div>
+      )}
+
       {showSettings && (
         <div className="schedule-settings-panel">
-          <h3>课节时间设置</h3>
+          <h3>学期设置</h3>
+          <div className="semester-date-row">
+            <label>学期起始日期（周一）：</label>
+            <input
+              type="date"
+              value={semesterStart}
+              onChange={e => saveSemester(e.target.value)}
+              className="semester-date-input"
+            />
+            <span className="settings-hint">设置后，"同步到任务"会根据周次自动计算每天的上课日期</span>
+          </div>
+
+          <h3 style={{ marginTop: "20px" }}>课节时间设置</h3>
           <p className="settings-hint">点击每节课设置上课时间和下课时间，右侧课表会实时显示</p>
           <div className="settings-periods">
             {schedule.periods.map(p => (
