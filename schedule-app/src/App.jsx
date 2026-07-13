@@ -116,10 +116,10 @@ function App() {
     return () => document.removeEventListener('mousedown', handler);
   }, [settingsOpen]);
 
-  // Close mobile sidebar on view change
+  // Close mobile sidebar on route change
   useEffect(() => {
     if (isMobile) setMobileSidebarOpen(false);
-  }, [view, isMobile]);
+  }, [location.pathname, isMobile]);
 
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
 
