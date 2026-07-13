@@ -8,6 +8,7 @@
  */
 
 const PUSHPLUS_URL = 'http://www.pushplus.plus/send';
+const SUPABASE_URL = 'https://ahvplgapdmizgtyyhvei.supabase.co';
 
 async function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -17,7 +18,7 @@ async function jsonResponse(data, status = 200) {
 }
 
 async function supabaseGet(env, table, query) {
-  const url = `${env.SUPABASE_URL}/rest/v1/${table}?${query}`;
+  const url = `${SUPABASE_URL}/rest/v1/${table}?${query}`;
   const resp = await fetch(url, {
     headers: {
       apikey: env.SUPABASE_SERVICE_ROLE_KEY,
@@ -32,7 +33,7 @@ async function supabaseGet(env, table, query) {
 }
 
 async function supabasePost(env, table, body) {
-  const url = `${env.SUPABASE_URL}/rest/v1/${table}`;
+  const url = `${SUPABASE_URL}/rest/v1/${table}`;
   const resp = await fetch(url, {
     method: 'POST',
     headers: {
@@ -63,7 +64,7 @@ export async function onRequest(context) {
     return jsonResponse({ error: 'unauthorized' }, 401);
   }
 
-  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
     return jsonResponse({ error: 'missing Supabase env vars' }, 500);
   }
 
