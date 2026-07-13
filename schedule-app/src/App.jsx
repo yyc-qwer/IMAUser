@@ -541,22 +541,6 @@ function App() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             <span className="nav-label">任务列表</span>
           </button>
-          {view === "tasks" && (
-            <div className="view-switcher">
-              <button className={`view-switch-btn ${taskViewMode === "list" ? "active" : ""}`} onClick={() => setTaskViewMode("list")} title="列表视图">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                <span className="nav-label">列表</span>
-              </button>
-              <button className={`view-switch-btn ${taskViewMode === "timeline" ? "active" : ""}`} onClick={() => setTaskViewMode("timeline")} title="日程视图">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-                <span className="nav-label">日程</span>
-              </button>
-              <button className={`view-switch-btn ${taskViewMode === "month" ? "active" : ""}`} onClick={() => setTaskViewMode("month")} title="月视图">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
-                <span className="nav-label">月份</span>
-              </button>
-            </div>
-          )}
           <button className={`nav-btn ${view === "schedule" ? "active" : ""}`} onClick={() => setView("schedule")}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
             <span className="nav-label">您的课表</span>
@@ -652,6 +636,27 @@ function App() {
                     COLORS={COLORS}
                   />
                 )}
+                <button
+                  className="btn-secondary view-toggle-btn"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap' }}
+                  onClick={() => {
+                    const modes = ["list", "timeline", "month"];
+                    const idx = modes.indexOf(taskViewMode);
+                    setTaskViewMode(modes[(idx + 1) % modes.length]);
+                  }}
+                  title={`当前：${taskViewMode === "list" ? "列表" : taskViewMode === "timeline" ? "日程" : "月份"} → 点击切换`}
+                >
+                  {taskViewMode === "list" && (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                  )}
+                  {taskViewMode === "timeline" && (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                  )}
+                  {taskViewMode === "month" && (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+                  )}
+                  {taskViewMode === "list" ? "列表" : taskViewMode === "timeline" ? "日程" : "月份"}
+                </button>
               </div>
             </header>
 
