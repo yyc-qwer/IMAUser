@@ -93,7 +93,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
   // -- Inherit type --
   const getInheritedType = (parentBlock) => {
     if (!parentBlock) return 'text';
-    if (['bulleted_list', 'numbered_list', 'todo'].includes(parentBlock.type)) return parentBlock.type;
+    if (['bulleted_list', 'todo'].includes(parentBlock.type)) return parentBlock.type;
     return 'text';
   };
 
@@ -540,7 +540,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
               onChange={e => { e.stopPropagation(); handleToggle(b.id); }}
               onClick={e => e.stopPropagation()}
             />
-            <input {...commonProps} />
+            <input {...commonProps} className={`${commonProps.className} ${b.meta?.checked ? 'todo-done' : ''}`} />
           </div>
         );
       case 'toggle':
@@ -561,23 +561,13 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
             <input {...commonProps} />
           </div>
         );
-      case 'numbered_list': {
-        const listBlocks = blocks.filter(x => x.type === 'numbered_list');
-        const num = listBlocks.findIndex(x => x.id === b.id) + 1;
-        return (
-          <div className="block-list-row">
-            <span className="list-number">{num}.</span>
-            <input {...commonProps} />
-          </div>
-        );
-      }
       default:
         return <input {...commonProps} />;
     }
   };
 
   const getPlaceholder = (type) => {
-    const map = { text: '输入内容...', heading: '标题', todo: '待办事项', toggle: '折叠列表', bulleted_list: '列表项', numbered_list: '列表项' };
+    const map = { text: '输入内容...', heading: '标题', todo: '待办事项', toggle: '折叠列表', bulleted_list: '列表项' };
     return map[type] || '输入内容...';
   };
 
@@ -678,7 +668,6 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
           <div className="convert-item" onClick={() => handleTypeChange(convertMenu.blockId, 'heading')}># 标题</div>
           <div className="convert-item" onClick={() => handleTypeChange(convertMenu.blockId, 'todo')}>☑️ 待办</div>
           <div className="convert-item" onClick={() => handleTypeChange(convertMenu.blockId, 'bulleted_list')}>• 无序列表</div>
-          <div className="convert-item" onClick={() => handleTypeChange(convertMenu.blockId, 'numbered_list')}>1. 有序列表</div>
           <div className="convert-item" onClick={() => handleTypeChange(convertMenu.blockId, 'toggle')}>▼ 折叠列表</div>
         </div>
       )}
@@ -693,7 +682,6 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
             <button onClick={() => handleTypeChange(convertMenu.blockId, 'heading')}># 标题</button>
             <button onClick={() => handleTypeChange(convertMenu.blockId, 'todo')}>☑️ 待办</button>
             <button onClick={() => handleTypeChange(convertMenu.blockId, 'bulleted_list')}>• 无序列表</button>
-            <button onClick={() => handleTypeChange(convertMenu.blockId, 'numbered_list')}>1. 有序列表</button>
             <button onClick={() => handleTypeChange(convertMenu.blockId, 'toggle')}>▼ 折叠列表</button>
             <button className="mobile-sheet-cancel" onClick={() => { setConvertMenu(null); setActiveBlockMenu(null); }}>取消</button>
           </div>
