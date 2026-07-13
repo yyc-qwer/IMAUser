@@ -246,7 +246,7 @@ export function useTasks() {
     setTasks(sortByUrgency(mapToCamelCase(taskData || [])));
     setTaskTypes(mapToCamelCase(typeData || []));
     setLoading(false);
-  }, []);
+  }, [user]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
