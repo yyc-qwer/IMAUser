@@ -64,6 +64,7 @@ export function scheduleTaskNotification(task) {
       .from('tasks')
       .select('*')
       .eq('id', task.id)
+      .eq('user_id', task.userId)
       .single();
     if (!current || current.completed || current.notified) return;
     if (Notification.permission === 'granted') {
@@ -77,9 +78,10 @@ export function scheduleTaskNotification(task) {
   }, delay);
 }
 
-async function rescheduleAllNotifications() {
+async function rescheduleAllNotifications(userId) {
   if (!isNotificationEnabled() || Notification.permission !== 'granted') return;
-  const { data } = await supabase.from('tasks').select('*');
+  if (!userId) return;
+  const { data } = await supabase.from('tasks').select('*').eq('user_id', userId);
   const tasks = mapToCamelCase(data || []);
   tasks.forEach(t => scheduleTaskNotification(t));
 }
@@ -94,7 +96,8 @@ export async function processRepeatTasks(currentUser) {
 
   if (lastCheck === todayStr) return;
 
-  const { data: taskData } = await supabase.from('tasks').select('*');
+  if (!currentUser?.id) return;
+  const { data: taskData } = await supabase.from('tasks').select('*').eq('user_id', currentUser.id);
   const tasks = mapToCamelCase(taskData || []);
 
   for (const task of tasks) {
@@ -225,15 +228,18 @@ export function useTasks() {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
+    if (!user) { setLoading(false); return; }
     const { data: taskData, error: taskError } = await supabase
       .from('tasks')
       .select('*')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
     if (taskError) console.error('fetch tasks error:', taskError);
 
     const { data: typeData, error: typeError } = await supabase
       .from('task_types')
       .select('*')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
     if (typeError) console.error('fetch types error:', typeError);
 
@@ -257,7 +263,7 @@ export function useTasks() {
   }, [refresh]);
 
   useEffect(() => {
-    rescheduleAllNotifications();
+    rescheduleAllNotifications(user?.id);
     processRepeatTasks(user);
   }, [user]);
 

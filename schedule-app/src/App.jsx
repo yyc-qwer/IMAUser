@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useTasks, isNotificationEnabled, setNotificationEnabled, requestNotificationPermission, calcProcrastinationIndex, getDeadlinePressure, getStreakData } from "./hooks/useTasks";
+import { useState, useEffect, useRef } from "react";
+import { useTasks, isNotificationEnabled, setNotificationEnabled, requestNotificationPermission } from "./hooks/useTasks";
 import { useAuth } from "./hooks/useAuth";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { formatCountdown, fmtDate } from "./utils/dateUtils";
@@ -11,149 +11,13 @@ import ScheduleView from "./components/ScheduleView";
 import PlusMenu from "./components/PlusMenu";
 import TimelineMemoView from "./components/TimelineMemoView";
 import MonthView from "./components/MonthView";
+import ToastContainer, { toast } from "./components/Toast";
+import LoginPage from "./components/LoginPage";
+import AnalyticsPage from "./components/AnalyticsPage";
+import PomodoroTimer from "./components/PomodoroTimer";
+import SubtaskList from "./components/SubtaskList";
 
 const COLORS = ["#5b9bd5", "#d9544f", "#3d7a5c", "#d4a853", "#7c6fb0", "#d4668e", "#3ba3b8", "#d4855e"];
-
-// ===== Pomodoro Timer Component =====
-function PomodoroTimer() {
-  const [minutes, setMinutes] = useState(25);
-  const [seconds, setSeconds] = useState(0);
-  const [isRunning, setIsRunning] = useState(false);
-  const [mode, setMode] = useState('work'); // work | shortBreak | longBreak
-  const intervalRef = useRef(null);
-
-  const modes = {
-    work: { min: 25, label: '专注', color: '#d9544f' },
-    shortBreak: { min: 5, label: '短休息', color: '#3d7a5c' },
-    longBreak: { min: 15, label: '长休息', color: '#d4855e' },
-  };
-
-  useEffect(() => {
-    if (isRunning) {
-      intervalRef.current = setInterval(() => {
-        setSeconds(prev => {
-          if (prev === 0) {
-            setMinutes(m => {
-              if (m === 0) {
-                setIsRunning(false);
-                if (Notification.permission === 'granted') {
-                  new Notification('番茄钟', { body: `${modes[mode].label}时间结束！` });
-                }
-                return modes[mode].min;
-              }
-              return m - 1;
-            });
-            return 59;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(intervalRef.current);
-  }, [isRunning, mode]);
-
-  const switchMode = (m) => {
-    setIsRunning(false);
-    setMode(m);
-    setMinutes(modes[m].min);
-    setSeconds(0);
-  };
-
-  const toggleTimer = () => setIsRunning(!isRunning);
-  const resetTimer = () => {
-    setIsRunning(false);
-    setMinutes(modes[mode].min);
-    setSeconds(0);
-  };
-
-  const progress = ((modes[mode].min * 60 - (minutes * 60 + seconds)) / (modes[mode].min * 60)) * 100;
-
-  return (
-    <div className="pomodoro-card">
-      <div className="pomodoro-modes">
-        {Object.entries(modes).map(([k, v]) => (
-          <button key={k} className={`pomodoro-mode-btn ${mode === k ? 'active' : ''}`}
-            style={mode === k ? { color: v.color, borderColor: v.color } : {}}
-            onClick={() => switchMode(k)}>{v.label}</button>
-        ))}
-      </div>
-      <div className="pomodoro-time" style={{ color: modes[mode].color }}>
-        {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-      </div>
-      <div className="pomodoro-progress">
-        <div className="pomodoro-progress-bar" style={{ width: `${progress}%`, background: modes[mode].color }} />
-      </div>
-      <div className="pomodoro-actions">
-        <button className="btn-primary" onClick={toggleTimer}>
-          {isRunning ? '暂停' : '开始'}
-        </button>
-        <button className="btn-secondary" onClick={resetTimer}>重置</button>
-      </div>
-    </div>
-  );
-}
-
-// ===== Subtask List Component =====
-function SubtaskList({ taskId, getSubtasks, addSubtask, toggleSubtask, deleteSubtask, onUpdate }) {
-  const [subtasks, setSubtasks] = useState([]);
-  const [newTitle, setNewTitle] = useState('');
-
-  const load = useCallback(async () => {
-    const list = await getSubtasks(taskId);
-    setSubtasks(list);
-  }, [taskId, getSubtasks]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const handleAdd = async () => {
-    if (!newTitle.trim()) return;
-    await addSubtask(taskId, newTitle.trim());
-    setNewTitle('');
-    await load();
-    onUpdate?.();
-  };
-
-  const handleToggle = async (id) => {
-    await toggleSubtask(id);
-    await load();
-    onUpdate?.();
-  };
-
-  const handleDelete = async (id) => {
-    await deleteSubtask(id);
-    await load();
-    onUpdate?.();
-  };
-
-  const completedCount = subtasks.filter(s => s.completed).length;
-  const progress = subtasks.length ? (completedCount / subtasks.length) * 100 : 0;
-
-  return (
-    <div className="subtask-list">
-      {subtasks.length > 0 && (
-        <div className="subtask-progress">
-          <div className="subtask-progress-bar" style={{ width: `${progress}%` }} />
-          <span className="subtask-progress-text">{completedCount}/{subtasks.length}</span>
-        </div>
-      )}
-      {subtasks.map(st => (
-        <div key={st.id} className={`subtask-item ${st.completed ? 'done' : ''}`}>
-          <input type="checkbox" checked={st.completed} onChange={() => handleToggle(st.id)} />
-          <span className="subtask-title">{st.title}</span>
-          <button className="btn-icon-sm" onClick={() => handleDelete(st.id)} title="删除">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </div>
-      ))}
-      <div className="subtask-add">
-        <input placeholder="添加子任务..." value={newTitle}
-          onChange={e => setNewTitle(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleAdd()} />
-        <button className="btn-primary" onClick={handleAdd}>+</button>
-      </div>
-    </div>
-  );
-}
 
 function App() {
   const { user, loading: authLoading, signUp, signIn, signOut } = useAuth();
@@ -165,13 +29,6 @@ function App() {
     getSubtasks, addSubtask, toggleSubtask, deleteSubtask,
     getWeeklyStats,
   } = useTasks();
-
-  // Login form state
-  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
-  const [authEmail, setAuthEmail] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
-  const [authError, setAuthError] = useState('');
-  const [authSubmitting, setAuthSubmitting] = useState(false);
 
   const [view, setView] = useState("tasks");
   const [taskViewMode, setTaskViewMode] = useState("list"); // "list" | "timeline" | "month"
@@ -357,23 +214,23 @@ function App() {
             source: "school",
           });
         }
-        alert(`成功导入 ${imported.length} 个任务`);
+        toast(`成功导入 ${imported.length} 个任务`, 'success');
       }
     } catch (err) {
-      alert("导入失败，请确保已从浏览器插件复制了正确的任务数据（JSON 格式）。\n\n提示：使用浏览器插件点击\"写入日程看板\"后，在此页面点击\"从存储拉取\"导入。");
+      toast('导入失败，请确保已从浏览器插件复制了正确的任务数据（JSON 格式）', 'error');
     }
   };
 
   const handleStoragePull = async () => {
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) {
-      alert("此功能仅在作为 Chrome 扩展运行时可用。\n\n替代方案：在浏览器插件中点击\"复制 JSON\"，然后在此页面使用\"从剪贴板导入\"。");
+      toast('此功能仅在作为 Chrome 扩展运行时可用', 'warning');
       return;
     }
     try {
       const result = await chrome.storage.local.get("imau_import_queue");
       const queue = result.imau_import_queue || [];
       if (queue.length === 0) {
-        alert("存储队列为空，请先在 IMAU 导入插件中点击\"写入日程看板\"。");
+        toast('存储队列为空，请先在 IMAU 导入插件中点击"写入日程看板"', 'info');
         return;
       }
       for (const item of queue) {
@@ -388,9 +245,9 @@ function App() {
         });
       }
       await chrome.storage.local.remove("imau_import_queue");
-      alert("成功从存储导入 " + queue.length + " 个任务");
+      toast('成功从存储导入 ' + queue.length + ' 个任务', 'success');
     } catch (err) {
-      alert("从存储导入失败: " + err.message);
+      toast('从存储导入失败: ' + err.message, 'error');
     }
   };
 
@@ -400,9 +257,9 @@ function App() {
       if (granted) {
         setNotificationEnabled(true);
         setNotifEnabled(true);
-        alert("通知已开启！创建任务时设置提醒时间即可收到桌面通知。");
+        toast('通知已开启！创建任务时设置提醒时间即可收到桌面通知', 'success');
       } else {
-        alert("通知权限被拒绝，请在浏览器设置中手动开启。");
+        toast('通知权限被拒绝，请在浏览器设置中手动开启', 'error');
       }
     } else {
       setNotificationEnabled(false);
@@ -435,59 +292,7 @@ function App() {
   if (authLoading) return <Skeleton />;
 
   // ===== Login / Register View =====
-  if (!user) {
-    const handleAuthSubmit = async (e) => {
-      e.preventDefault();
-      setAuthError('');
-      setAuthSubmitting(true);
-      if (authMode === 'register') {
-        const { error } = await signUp(authEmail, authPassword);
-        if (error) setAuthError(error.message);
-        else setAuthError('注册成功！请查看邮箱验证（如未关闭验证则直接登录）');
-      } else {
-        const { error } = await signIn(authEmail, authPassword);
-        if (error) setAuthError('邮箱或密码错误');
-      }
-      setAuthSubmitting(false);
-    };
-
-    return (
-      <div className="auth-page">
-        <div className="auth-card">
-          <h1 className="auth-logo">日程看板</h1>
-          <p className="auth-subtitle">登录后管理你的日程任务</p>
-          <form className="auth-form" onSubmit={handleAuthSubmit}>
-            <input
-              type="email"
-              placeholder="邮箱地址"
-              value={authEmail}
-              onChange={e => setAuthEmail(e.target.value)}
-              required
-            />
-            <input
-              type="password"
-              placeholder="密码"
-              value={authPassword}
-              onChange={e => setAuthPassword(e.target.value)}
-              required
-              minLength={6}
-            />
-            {authError && <div className="auth-error">{authError}</div>}
-            <button type="submit" className="btn-primary auth-btn" disabled={authSubmitting}>
-              {authSubmitting ? '处理中...' : (authMode === 'login' ? '登录' : '注册')}
-            </button>
-          </form>
-          <div className="auth-switch">
-            {authMode === 'login' ? (
-              <span>还没有账号？<button className="link-btn" onClick={() => { setAuthMode('register'); setAuthError(''); }}>去注册</button></span>
-            ) : (
-              <span>已有账号？<button className="link-btn" onClick={() => { setAuthMode('login'); setAuthError(''); }}>去登录</button></span>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (!user) return <LoginPage />;
 
   if (loading) return <Skeleton />;
 
@@ -771,7 +576,7 @@ function App() {
         )}
 
         {view === "analytics" && (
-          <AnalyticsView
+          <AnalyticsPage
             tasks={tasks} activeTasks={activeTasks} completedTasks={completedTasks}
             taskTypes={taskTypes} weeklyStats={weeklyStats}
             maxWeeklyCompleted={maxWeeklyCompleted} maxWeeklyCreated={maxWeeklyCreated}
@@ -925,6 +730,7 @@ function App() {
           </div>
         )}
       </main>
+      <ToastContainer />
     </div>
   );
 }
@@ -967,235 +773,6 @@ function TaskCard({ task, typeName, color, done, onToggle, onEdit, onDelete, onE
         </div>
       </div>
     </div>
-  );
-}
-
-// ===== Analytics View Component =====
-function AnalyticsView({ tasks, activeTasks, completedTasks, taskTypes, weeklyStats, maxWeeklyCompleted, maxWeeklyCreated, sortedMonths, maxCount, typeDistribution, maxTypeCount, priorityCount }) {
-  const procrastinationIndex = calcProcrastinationIndex(tasks);
-  const deadlinePressure = getDeadlinePressure(tasks);
-  const streakData = getStreakData(tasks);
-
-  const maxPressure = Math.max(1, ...deadlinePressure.map(d => d.count));
-  const upcomingDeadlines = deadlinePressure.filter(d => d.count > 0);
-  const highPressureDays = deadlinePressure.filter(d => d.count >= 3);
-
-  // Streak color levels (GitHub style)
-  const getStreakColor = (count) => {
-    if (count === 0) return 'var(--surface2)';
-    if (count === 1) return '#c8e6d4';
-    if (count === 2) return '#8cc9a0';
-    if (count <= 4) return '#4da16a';
-    return '#2d6a4f';
-  };
-
-  // Group streak days into weeks for grid display
-  const weeks = [];
-  for (let i = 0; i < streakData.days.length; i += 7) {
-    weeks.push(streakData.days.slice(i, i + 7));
-  }
-
-  const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
-
-  return (
-    <>
-      <header className="main-header"><h2>数据分析</h2></header>
-      <div className="analytics-grid">
-
-        {/* Procrastination Index */}
-        <div className="chart-card procrastination-card">
-          <h4>拖延指数</h4>
-          {procrastinationIndex === null ? (
-            <div className="empty">完成带截止日期的任务后生成评分</div>
-          ) : (
-            <div className="procrastination-content">
-              <div className="procrastination-score" style={{
-                color: procrastinationIndex >= 80 ? '#3d7a5c' : procrastinationIndex >= 60 ? '#d4a853' : '#d9544f'
-              }}>
-                {procrastinationIndex}
-                <span className="procrastination-max">/100</span>
-              </div>
-              <div className="procrastination-label">
-                {procrastinationIndex >= 80 ? '效率达人' : procrastinationIndex >= 60 ? '还可以' : procrastinationIndex >= 40 ? '有点拖延' : '重度拖延'}
-              </div>
-              <div className="procrastination-bar">
-                <div className="procrastination-fill" style={{
-                  width: `${procrastinationIndex}%`,
-                  background: procrastinationIndex >= 80 ? '#3d7a5c' : procrastinationIndex >= 60 ? '#d4a853' : '#d9544f'
-                }} />
-              </div>
-              <p className="procrastination-hint">
-                基于已完成的任务中，准时完成率和平均提前天数计算
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Deadline Pressure */}
-        <div className="chart-card pressure-card">
-          <h4>未来30天 Deadline 压力</h4>
-          {upcomingDeadlines.length === 0 ? (
-            <div className="empty">未来30天暂无截止任务</div>
-          ) : (
-            <>
-              <div className="pressure-chart">
-                {deadlinePressure.map(d => (
-                  <div key={d.date} className="pressure-col" title={`${d.date}: ${d.count}个任务`}>
-                    <div className="pressure-bar-wrapper">
-                      <div
-                        className="pressure-bar"
-                        style={{
-                          height: `${(d.count / maxPressure) * 80}px`,
-                          background: d.count >= 3 ? '#d9544f' : d.count >= 1 ? '#d4855e' : 'var(--surface2)',
-                          opacity: d.isWeekend ? 0.6 : 1,
-                        }}
-                      />
-                    </div>
-                    <span className={`pressure-label ${d.count >= 3 ? 'urgent' : ''}`}>{d.label}</span>
-                  </div>
-                ))}
-              </div>
-              {highPressureDays.length > 0 && (
-                <div className="pressure-warning">
-                  <span className="warning-icon">⚠️</span>
-                  {highPressureDays.length} 天任务堆积（≥3个），建议提前规划！
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Streak Calendar */}
-        <div className="chart-card streak-card">
-          <h4>连续打卡日历</h4>
-          <div className="streak-header">
-            <div className="streak-badge">
-              <span className="streak-number">{streakData.currentStreak}</span>
-              <span className="streak-text">当前连续</span>
-            </div>
-            <div className="streak-badge">
-              <span className="streak-number">{streakData.maxStreak}</span>
-              <span className="streak-text">最长连续</span>
-            </div>
-          </div>
-          <div className="streak-calendar">
-            <div className="streak-weekdays">
-              {weekDays.map(d => <span key={d} className="streak-weekday">{d}</span>)}
-            </div>
-            <div className="streak-weeks">
-              {weeks.map((week, wi) => (
-                <div key={wi} className="streak-week">
-                  {week.map((day, di) => (
-                    <div
-                      key={di}
-                      className="streak-day"
-                      style={{ background: getStreakColor(day.count) }}
-                      title={`${day.date}: 完成${day.count}个任务`}
-                    />
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="streak-legend">
-            <span>少</span>
-            <div className="streak-legend-day" style={{ background: 'var(--surface2)' }} />
-            <div className="streak-legend-day" style={{ background: '#0e4429' }} />
-            <div className="streak-legend-day" style={{ background: '#006d32' }} />
-            <div className="streak-legend-day" style={{ background: '#26a641' }} />
-            <div className="streak-legend-day" style={{ background: '#39d353' }} />
-            <span>多</span>
-          </div>
-        </div>
-
-        {/* Existing charts */}
-        <div className="chart-card">
-          <h4>近7日完成情况</h4>
-          <div className="weekly-chart">
-            {weeklyStats.map(s => (
-              <div key={s.date} className="weekly-col">
-                <div className="weekly-bars">
-                  <div className="weekly-bar completed" style={{ height: `${(s.completed / maxWeeklyCompleted) * 60}px` }} />
-                  <div className="weekly-bar created" style={{ height: `${(s.created / maxWeeklyCreated) * 60}px` }} />
-                </div>
-                <span className="weekly-label">{s.label}</span>
-              </div>
-            ))}
-          </div>
-          <div className="weekly-legend">
-            <span><span className="legend-dot" style={{ background: 'var(--success)' }} />完成</span>
-            <span><span className="legend-dot" style={{ background: 'var(--primary)' }} />新增</span>
-          </div>
-        </div>
-
-        <div className="chart-card">
-          <h4>每月任务分布</h4>
-          {sortedMonths.length === 0 ? <div className="empty">暂无数据</div> : (
-            <div className="bar-chart">
-              {sortedMonths.map(([month, count]) => {
-                const pct = (count / maxCount) * 100;
-                return (
-                  <div key={month} className="bar-row">
-                    <span className="bar-label">{month}</span>
-                    <div className="bar-track"><div className="bar-fill" style={{ width: pct + "%" }} /></div>
-                    <span className="bar-count">{count}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="chart-card">
-          <h4>按类型统计</h4>
-          {Object.keys(typeDistribution).length === 0 ? <div className="empty">暂无数据</div> : (
-            <div className="type-chart">
-              {Object.entries(typeDistribution).map(([name, count]) => {
-                const pct = (count / maxTypeCount) * 100;
-                return (
-                  <div key={name} className="type-stat-row">
-                    <span className="type-stat-name">{name}</span>
-                    <span className="type-stat-bar" style={{ width: pct + "%" }} />
-                    <span className="type-stat-count">{count}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="chart-card">
-          <h4>优先级分布</h4>
-          <div className="priority-chart">
-            <div className="priority-row">
-              <span className="priority-label high">高</span>
-              <div className="priority-track"><div className="priority-fill high" style={{ width: `${activeTasks.length ? (priorityCount.high / activeTasks.length) * 100 : 0}%` }} /></div>
-              <span className="priority-count">{priorityCount.high}</span>
-            </div>
-            <div className="priority-row">
-              <span className="priority-label medium">中</span>
-              <div className="priority-track"><div className="priority-fill medium" style={{ width: `${activeTasks.length ? (priorityCount.medium / activeTasks.length) * 100 : 0}%` }} /></div>
-              <span className="priority-count">{priorityCount.medium}</span>
-            </div>
-            <div className="priority-row">
-              <span className="priority-label low">低</span>
-              <div className="priority-track"><div className="priority-fill low" style={{ width: `${activeTasks.length ? (priorityCount.low / activeTasks.length) * 100 : 0}%` }} /></div>
-              <span className="priority-count">{priorityCount.low}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="chart-card summary-card">
-          <h4>总览</h4>
-          <div className="summary-grid">
-            <div className="summary-item"><span className="sum-val">{tasks.length}</span><span>总任务数</span></div>
-            <div className="summary-item"><span className="sum-val">{activeTasks.length}</span><span>进行中</span></div>
-            <div className="summary-item"><span className="sum-val">{completedTasks.length}</span><span>已完成</span></div>
-            <div className="summary-item"><span className="sum-val">{Math.round(tasks.length ? (completedTasks.length / tasks.length) * 100 : 0)}%</span><span>完成率</span></div>
-          </div>
-        </div>
-      </div>
-    </>
   );
 }
 

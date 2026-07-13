@@ -1,4 +1,5 @@
 import { useAIChat } from '../hooks/useAIChat';
+import { toast } from './Toast';
 
 export default function AIChat({ tasks, taskTypes, addTask, updateTask, deleteTask, toggleComplete, refresh }) {
   const { messages, input, setInput, loading, sendMessage, sendSystemQuery, clearMessages } = useAIChat();
@@ -26,7 +27,7 @@ export default function AIChat({ tasks, taskTypes, addTask, updateTask, deleteTa
             notes: p.notes || `由 AI 助手添加`,
             source: 'ai',
           });
-          alert(`✅ 已添加任务：${p.title}`);
+          toast(`已添加任务：${p.title}`, 'success');
           await refresh();
           break;
         }
@@ -34,12 +35,12 @@ export default function AIChat({ tasks, taskTypes, addTask, updateTask, deleteTa
           const task = tasks.find(t => t.id === action.payload.id);
           if (task && !task.completed) {
             await toggleComplete(action.payload.id);
-            alert(`✅ 已标记完成`);
+            toast('已标记完成', 'success');
             await refresh();
           } else if (task?.completed) {
-            alert('该任务已完成');
+            toast('该任务已完成', 'info');
           } else {
-            alert('未找到该任务');
+            toast('未找到该任务', 'warning');
           }
           break;
         }
@@ -47,7 +48,7 @@ export default function AIChat({ tasks, taskTypes, addTask, updateTask, deleteTa
           const task = tasks.find(t => t.id === action.payload.id);
           if (task && confirm(`确定删除任务「${task.title}」吗？`)) {
             await deleteTask(action.payload.id);
-            alert(`✅ 已删除`);
+            toast('已删除', 'success');
             await refresh();
           }
           break;
@@ -61,15 +62,15 @@ export default function AIChat({ tasks, taskTypes, addTask, updateTask, deleteTa
           if (p.notes) updates.notes = p.notes;
 
           await updateTask(p.id, updates);
-          alert(`✅ 已更新任务`);
+          toast('已更新任务', 'success');
           await refresh();
           break;
         }
         default:
-          alert('未知操作类型');
+          toast('未知操作类型', 'warning');
       }
     } catch (err) {
-      alert('执行失败：' + err.message);
+      toast('执行失败：' + err.message, 'error');
     }
   };
 
