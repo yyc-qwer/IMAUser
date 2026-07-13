@@ -135,8 +135,7 @@ button:active { transform: scale(0.98); }
 }
 
 .sidebar.expanded { width: 240px; }
-.sidebar.collapsed { width: 72px; }
-.sidebar.collapsed:hover { width: 240px; }
+.sidebar.collapsed { width: 240px; }
 
 /* Sidebar Header */
 .sidebar-header {
@@ -145,8 +144,7 @@ button:active { transform: scale(0.98); }
   flex-shrink: 0;
 }
 
-.sidebar.collapsed .sidebar-header { justify-content: center; }
-.sidebar.collapsed:hover .sidebar-header,
+.sidebar.collapsed .sidebar-header,
 .sidebar.expanded .sidebar-header { justify-content: space-between; }
 
 .logo {
@@ -154,22 +152,12 @@ button:active { transform: scale(0.98); }
   font-size: 18px; font-weight: 800; letter-spacing: -0.3px;
   white-space: nowrap; color: var(--text);
   flex-shrink: 0; padding-left: 0;
-  transition: padding-left 0.5s var(--ease-out);
 }
-.sidebar.collapsed .logo { justify-content: center; padding-left: 0; width: 48px; margin: 0 auto; }
-.sidebar.collapsed .logo svg { margin-left: 0; width: 18px; height: 18px; }
-.sidebar.expanded .logo,
-.sidebar.collapsed:hover .logo { padding-left: 16px; }
 .logo svg { flex-shrink: 0; width: 22px; height: 22px; color: var(--primary); }
 
 .logo-text {
   white-space: nowrap;
-  transition: opacity 0.4s var(--ease-out), max-width 0.4s var(--ease-out);
-  overflow: hidden;
 }
-.sidebar.collapsed .logo-text { opacity: 0; max-width: 0; }
-.sidebar.expanded .logo-text,
-.sidebar.collapsed:hover .logo-text { opacity: 1; max-width: 120px; }
 
 /* Pin Button */
 .sidebar-pin-btn {
@@ -179,10 +167,8 @@ button:active { transform: scale(0.98); }
   transition: opacity 0.4s var(--ease-out), background 0.2s, color 0.2s;
   flex-shrink: 0;
 }
+.sidebar-pin-btn { opacity: 1; pointer-events: auto; }
 .sidebar-pin-btn:hover { background: var(--surface2); color: var(--text); }
-.sidebar.collapsed .sidebar-pin-btn { opacity: 0; pointer-events: none; }
-.sidebar.collapsed:hover .sidebar-pin-btn,
-.sidebar.expanded .sidebar-pin-btn { opacity: 1; pointer-events: auto; }
 
 /* Navigation */
 .sidebar nav {
@@ -214,26 +200,14 @@ button:active { transform: scale(0.98); }
 
 .nav-label {
   white-space: nowrap;
-  overflow: hidden;
-  transition: opacity 0.4s var(--ease-out), max-width 0.4s var(--ease-out);
 }
-.sidebar.collapsed .nav-label { opacity: 0; max-width: 0; }
-.sidebar.collapsed .nav-btn { justify-content: center; padding: 12px 0; gap: 0; margin: 0 auto; width: 48px; box-sizing: border-box; }
-.sidebar.collapsed:hover .nav-btn { justify-content: flex-start; padding: 12px 16px; gap: 14px; }
-.sidebar.expanded .nav-label,
-.sidebar.collapsed:hover .nav-label { opacity: 1; max-width: 140px; }
 
 /* Sidebar sections */
 .sidebar-section {
   padding: 16px 4px;
   border-top: 1px solid var(--border);
   margin-top: 12px;
-  transition: opacity 0.4s var(--ease-out), max-height 0.5s var(--ease-out);
-  overflow: hidden;
 }
-.sidebar.collapsed .sidebar-section { max-height: 0; opacity: 0; padding: 0; margin: 0; border: none; }
-.sidebar.expanded .sidebar-section,
-.sidebar.collapsed:hover .sidebar-section { max-height: 200px; opacity: 1; }
 
 /* Notification Toggle */
 .notif-toggle {
@@ -258,12 +232,7 @@ button:active { transform: scale(0.98); }
 .sidebar-stats {
   display: flex; gap: 18px; padding-top: 20px;
   border-top: 1px solid var(--border); margin-top: auto;
-  transition: opacity 0.4s var(--ease-out), max-height 0.5s var(--ease-out);
-  overflow: hidden;
 }
-.sidebar.collapsed .sidebar-stats { max-height: 0; opacity: 0; padding-top: 0; margin: 0; border: none; }
-.sidebar.expanded .sidebar-stats,
-.sidebar.collapsed:hover .sidebar-stats { max-height: 80px; opacity: 1; }
 .stat { display: flex; flex-direction: column; align-items: center; flex: 1; }
 .stat-val { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
 .stat-label { font-size: 11px; color: var(--text3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -286,10 +255,7 @@ button:active { transform: scale(0.98); }
   white-space: nowrap; overflow: hidden;
   transition: opacity 0.4s var(--ease-out), max-width 0.4s var(--ease-out);
 }
-.sidebar.collapsed .settings-btn { justify-content: center; }
-.sidebar.collapsed .settings-btn .nav-label { opacity: 0; max-width: 0; }
-.sidebar.expanded .settings-btn .nav-label,
-.sidebar.collapsed:hover .settings-btn .nav-label { opacity: 1; max-width: 140px; }
+.settings-btn .nav-label { opacity: 1; max-width: 140px; }
 
 /* Settings Dropdown */
 .settings-dropdown {
