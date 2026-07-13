@@ -157,7 +157,7 @@ button:active { transform: scale(0.98); }
   transition: padding-left 0.5s var(--ease-out);
 }
 .sidebar.collapsed .logo { justify-content: center; padding-left: 0; width: 48px; margin: 0 auto; }
-.sidebar.collapsed .logo svg { margin-left: 0; width: 20px; height: 20px; }
+.sidebar.collapsed .logo svg { margin-left: 0; width: 18px; height: 18px; }
 .sidebar.expanded .logo,
 .sidebar.collapsed:hover .logo { padding-left: 16px; }
 .logo svg { flex-shrink: 0; width: 22px; height: 22px; color: var(--primary); }
