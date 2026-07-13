@@ -50,7 +50,7 @@ export default function useSettings(user) {
   useEffect(() => {
     if (!user) return;
     const save = async () => {
-      await supabase.from("user_settings").upsert(
+      const { error } = await supabase.from("user_settings").upsert(
         {
           user_id: user.id,
           pushplus_token: pushplusToken,
@@ -59,6 +59,11 @@ export default function useSettings(user) {
         },
         { onConflict: "user_id" }
       );
+      if (error) {
+        console.error("保存 PushPlus Token 失败:", error.message, error.details, error.hint);
+      } else {
+        console.log("PushPlus Token 已保存到 Supabase, user_id:", user.id, "token:", pushplusToken ? pushplusToken.slice(0,6)+"..." : "(空)");
+      }
     };
     // 防抖：等用户停止输入 1 秒后再保存
     const timer = setTimeout(save, 1000);
