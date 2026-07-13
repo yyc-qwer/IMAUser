@@ -7,6 +7,7 @@ import AIChat from "./components/AIChat";
 import SplashScreen from "./components/SplashScreen";
 import Skeleton from "./components/Skeleton";
 import TaskDetailPage from "./components/TaskDetailPage";
+import ScheduleView from "./components/ScheduleView";
 
 const COLORS = ["#5b9bd5", "#d9544f", "#3d7a5c", "#d4a853", "#7c6fb0", "#d4668e", "#3ba3b8", "#d4855e"];
 
@@ -536,6 +537,10 @@ function App() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             <span className="nav-label">任务列表</span>
           </button>
+          <button className={`nav-btn ${view === "schedule" ? "active" : ""}`} onClick={() => setView("schedule")}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+            <span className="nav-label">您的课表</span>
+          </button>
           <button className={`nav-btn ${view === "types" ? "active" : ""}`} onClick={() => setView("types")}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
             <span className="nav-label">任务类型</span>
@@ -735,6 +740,10 @@ function App() {
             isMobile={isMobile}
             onBack={() => { setView("tasks"); setSelectedTask(null); }}
           />
+        )}
+
+        {view === "schedule" && (
+          <ScheduleView />
         )}
 
         {view === "import" && (

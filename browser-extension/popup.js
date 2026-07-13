@@ -12,6 +12,8 @@
 
   var extractedData = null;
 
+  var exportCsvBtn = document.getElementById("exportCsvBtn");
+
   function setStatus(type, msg) {
     statusEl.className = "status " + type;
     statusEl.textContent = msg;
@@ -22,6 +24,8 @@
     previewEl.textContent = JSON.stringify(data, null, 2);
     copyBtn.disabled = false;
     if (pushBtn) pushBtn.disabled = false;
+
+    exportCsvBtn.disabled = false;   // 有数据时启用
   }
 
   function hidePreview() {
@@ -29,6 +33,8 @@
     copyBtn.disabled = true;
     if (pushBtn) pushBtn.disabled = true;
     extractedData = null;
+
+    exportCsvBtn.disabled = true;    // 没数据时禁用
   }
 
   async function extract(selectors) {
@@ -145,7 +151,62 @@
     } catch (err) {
       setStatus("error", "\u63a8\u9001\u5931\u8d25: " + err.message);
     }
+
+    
   }
+  // ===== 导出 CSV（新增） =====
+function exportCSV() {
+  if (!extractedData || extractedData.length === 0) return;
+
+  // 1. 只筛选类型为 "课程" 的数据（作业和课表分开，你只要课表）
+  var courses = extractedData.filter(function(item) {
+    return item.type === "课程";
+  });
+
+  if (courses.length === 0) {
+    setStatus("error", "没有课程数据可导出");
+    return;
+  }
+
+  // 2. 定义 CSV 表头（完全对应你的课表结构）
+  var headers = ["星期", "节次", "课程名", "上课地点", "任课教师", "上课周次", "学时类型"];
+  var rows = [headers.join(",")]; // 表头行
+
+  // 3. 逐行生成数据
+  for (var i = 0; i < courses.length; i++) {
+    var c = courses[i];
+    // 把每个字段用双引号包起来，防止内容里有逗号导致错位
+    var row = [
+      '"' + (c.weekday || "") + '"',
+      '"' + (c.period || "") + '"',
+      '"' + (c.courseName || "").replace(/"/g, '""') + '"',
+      '"' + (c.location || "").replace(/"/g, '""') + '"',
+      '"' + (c.teacher || "").replace(/"/g, '""') + '"',
+      '"' + (c.classTime || "").replace(/"/g, '""') + '"',
+      '"' + (c.classType || "").replace(/"/g, '""') + '"'
+    ];
+    rows.push(row.join(","));
+  }
+
+  // 4. 拼接成完整 CSV 字符串，并加上 BOM（让 Excel 正确识别中文）
+  var csvString = rows.join("\n");
+  var blob = new Blob(["\uFEFF" + csvString], { type: "text/csv;charset=utf-8;" });
+
+  // 5. 触发浏览器下载
+  var link = document.createElement("a");
+  var url = URL.createObjectURL(blob);
+  link.href = url;
+  link.download = "课程表_export.csv";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  setStatus("success", "已导出 " + courses.length + " 条课程到 CSV 文件！");
+}
+
+// 6. 绑定新按钮的点击事件
+exportCsvBtn.addEventListener("click", exportCSV);
 
   // ===== Button bindings =====
 

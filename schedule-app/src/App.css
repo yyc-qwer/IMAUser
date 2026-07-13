@@ -1798,3 +1798,426 @@ button:active { transform: scale(0.98); }
     }
   }
 }
+
+/* =============================================
+   Schedule View — 您的课表
+   ============================================= */
+
+.schedule-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.btn-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.2s var(--ease-out);
+}
+
+.btn-sm:hover {
+  background: var(--surface2);
+  color: var(--text);
+  border-color: var(--primary);
+}
+
+.btn-sm.danger-btn:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.schedule-import-status {
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.schedule-import-status.success {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.schedule-import-status.error {
+  background: rgba(201, 74, 74, 0.1);
+  color: var(--danger);
+}
+
+/* ===== Settings Panel ===== */
+.schedule-settings-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.schedule-settings-panel h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.settings-hint {
+  font-size: 13px;
+  color: var(--text2);
+  margin-bottom: 16px;
+}
+
+.settings-periods {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.settings-period-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+}
+
+.period-label {
+  font-weight: 600;
+  font-size: 14px;
+  min-width: 60px;
+  color: var(--text);
+}
+
+.settings-period-row input[type="time"] {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.period-dash {
+  color: var(--text3);
+}
+
+.period-name-input {
+  width: 80px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.period-remove-btn {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.period-remove-btn:hover {
+  color: var(--danger);
+  background: rgba(201, 74, 74, 0.1);
+}
+
+/* ===== Schedule Table ===== */
+.schedule-table-wrapper {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.schedule-table-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+}
+
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  min-width: 700px;
+}
+
+.schedule-table th,
+.schedule-table td {
+  border: 1px solid var(--border);
+  padding: 0;
+  vertical-align: top;
+}
+
+.corner-cell {
+  width: 56px;
+  min-width: 56px;
+  background: var(--surface2);
+}
+
+.day-header {
+  text-align: center;
+  padding: 12px 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--surface2);
+}
+
+.time-axis-header {
+  width: 72px;
+  min-width: 72px;
+  text-align: center;
+  padding: 12px 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text2);
+  background: var(--surface2);
+}
+
+.period-cell {
+  text-align: center;
+  padding: 12px 4px;
+  background: var(--surface2);
+  vertical-align: middle;
+}
+
+.period-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text2);
+}
+
+/* Time axis on the right */
+.time-axis-cell {
+  text-align: center;
+  padding: 12px 4px;
+  background: var(--surface2);
+  vertical-align: middle;
+}
+
+.time-start {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.time-sep {
+  font-size: 10px;
+  color: var(--text3);
+  margin: 2px 0;
+}
+
+.time-end {
+  font-size: 12px;
+  color: var(--text3);
+}
+
+/* Course cells */
+.schedule-cell {
+  height: 80px;
+  cursor: pointer;
+  transition: background 0.15s;
+  position: relative;
+}
+
+.schedule-cell.empty {
+  background: var(--surface);
+}
+
+.schedule-cell.empty:hover {
+  background: var(--surface2);
+}
+
+.schedule-cell.has-course {
+  background: var(--surface);
+}
+
+.schedule-cell.has-course:hover {
+  filter: brightness(0.97);
+}
+
+.cell-empty-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 80px;
+  font-size: 20px;
+  color: var(--text3);
+  opacity: 0.4;
+}
+
+/* Course card inside cell */
+.course-card {
+  padding: 8px 10px;
+  height: 80px;
+  overflow: hidden;
+  border-left: 3px solid var(--course-color, var(--primary));
+  background: color-mix(in srgb, var(--course-color, var(--primary)) 8%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.course-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.course-location {
+  font-size: 11px;
+  color: var(--text2);
+}
+
+.course-teacher {
+  font-size: 11px;
+  color: var(--text2);
+}
+
+.course-week {
+  font-size: 10px;
+  color: var(--text3);
+}
+
+.course-type-tag {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--course-color, var(--primary)) 15%, transparent);
+  color: var(--course-color, var(--primary));
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+/* ===== Edit Modal ===== */
+.schedule-edit-modal {
+  max-width: 460px;
+}
+
+.schedule-edit-modal .modal-subtitle {
+  font-size: 13px;
+  color: var(--text2);
+  margin-bottom: 16px;
+}
+
+.btn-danger {
+  background: rgba(201, 74, 74, 0.1);
+  color: var(--danger);
+  border: 1px solid rgba(201, 74, 74, 0.2);
+}
+
+.btn-danger:hover {
+  background: rgba(201, 74, 74, 0.2);
+}
+
+/* ===== Mobile ===== */
+@media (max-width: 768px) {
+  .schedule-table {
+    min-width: 600px;
+  }
+
+  .schedule-cell {
+    height: 64px;
+  }
+
+  .course-card {
+    height: 64px;
+    padding: 6px 8px;
+  }
+
+  .cell-empty-hint {
+    height: 64px;
+  }
+
+  .course-name {
+    font-size: 12px;
+  }
+
+  .course-location,
+  .course-teacher {
+    font-size: 10px;
+  }
+
+  .course-week,
+  .course-type-tag {
+    display: none;
+  }
+
+  .schedule-toolbar {
+    gap: 6px;
+  }
+
+  .btn-sm {
+    padding: 7px 12px;
+    font-size: 12px;
+  }
+
+  .settings-period-row {
+    flex-wrap: wrap;
+  }
+
+  .schedule-settings-panel {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .schedule-table {
+    min-width: 500px;
+  }
+
+  .schedule-cell {
+    height: 56px;
+  }
+
+  .course-card {
+    height: 56px;
+  }
+
+  .cell-empty-hint {
+    height: 56px;
+  }
+
+  .course-name {
+    font-size: 11px;
+  }
+
+  .course-location,
+  .course-teacher {
+    display: none;
+  }
+}
+
+/* Dark theme adjustments */
+[data-theme="dark"] .course-card {
+  background: color-mix(in srgb, var(--course-color, var(--primary)) 12%, transparent);
+}
+
+[data-theme="dark"] .schedule-cell.has-course:hover {
+  filter: brightness(1.1);
+}
