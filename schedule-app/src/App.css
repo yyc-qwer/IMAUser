@@ -217,8 +217,6 @@ button:active { transform: scale(0.98); }
   transition: opacity 0.4s var(--ease-out), max-width 0.4s var(--ease-out);
 }
 .sidebar.collapsed .nav-label { opacity: 0; max-width: 0; }
-.sidebar.collapsed .nav-btn { justify-content: center; padding: 12px 0; gap: 0; margin: 0 auto; width: 48px; box-sizing: border-box; }
-.sidebar.collapsed:hover .nav-btn { justify-content: flex-start; padding: 12px 16px; gap: 14px; }
 .sidebar.expanded .nav-label,
 .sidebar.collapsed:hover .nav-label { opacity: 1; max-width: 140px; }
 
