@@ -31,9 +31,27 @@ function parseWeekday(str) {
   return map[str?.trim()] ?? -1;
 }
 
-// "第1,2节" → [0, 1]  /  "第3节" → [2]  /  "第1-2节" → [0, 1]
+// 中文数字 → 阿拉伯数字
+function chineseNumToDigit(ch) {
+  const map = { "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10 };
+  return map[ch] ?? null;
+}
+
+// "第1,2节" → [0, 1]  /  "第3节" → [2]  /  "第1-2节" → [0, 1]  /  "第一大节" → [0, 1]
 function parsePeriods(str) {
   if (!str) return [];
+
+  // 匹配 "第X大节"（中文数字或阿拉伯数字），每大节 = 2 小节
+  const bigMatch = str.match(/第([一二三四五六七八九十\d]+)大节/);
+  if (bigMatch) {
+    const num = chineseNumToDigit(bigMatch[1]) ?? parseInt(bigMatch[1], 10);
+    if (!isNaN(num) && num >= 1) {
+      const start = (num - 1) * 2; // 第一大节→节0-1, 第二大节→节2-3, ...
+      return [start, start + 1];
+    }
+  }
+
+  // 匹配 "第N,N节" 或 "第N-N节"
   const m = str.match(/第([\d,\-]+)节/);
   if (!m) return [];
   const parts = m[1].split(",");
