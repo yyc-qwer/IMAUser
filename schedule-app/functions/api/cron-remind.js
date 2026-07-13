@@ -91,14 +91,20 @@ export async function onRequest(context) {
     for (const s of allSettings) {
       if (!s.pushplus_token) continue;
 
-      // 获取该用户未完成且截止日期在今天/明天的任务
-      const tasks = await supabaseGet(
+      // 获取该用户截止日期在今天/明天的任务 (completed 在 JS 里过滤，避免列类型不匹配)
+      const tasksRaw = await supabaseGet(
         env,
         'tasks',
-        `select=id,title,end_date,priority&user_id=eq.${s.user_id}&completed=eq.false&end_date=lte.${tomorrow}&end_date=gte.1900-01-01&order=end_date.asc&limit=50`
+        `select=id,title,end_date,completed&user_id=eq.${s.user_id}&end_date=lte.${tomorrow}&end_date=gte.1900-01-01&order=end_date.asc&limit=50`
       );
 
-      if (!Array.isArray(tasks)) continue;
+      if (!Array.isArray(tasksRaw)) continue;
+
+      // 过滤掉已完成的任务（兼容 boolean / text / int 类型）
+      const tasks = tasksRaw.filter(t => {
+        const c = t.completed;
+        return c !== true && c !== 1 && c !== 'true' && c !== '1';
+      });
 
       for (const t of tasks) {
         if (!t.end_date) continue;
