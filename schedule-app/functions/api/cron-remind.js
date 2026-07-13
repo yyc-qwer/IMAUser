@@ -5,7 +5,7 @@
  */
 
 const PUSHPLUS_URL = 'http://www.pushplus.plus/send';
-const SUPABASE_URL = 'https://ahvplgapdmizgtyyhvei.supabase.co';
+const SUPABASE_URL = 'https://ahvpigapdmizgtyyhvei.supabase.co';
 
 async function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {
