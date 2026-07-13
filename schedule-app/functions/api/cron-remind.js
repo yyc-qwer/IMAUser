@@ -76,15 +76,15 @@ export async function onRequest(context) {
   const details = [];
 
   try {
-    // Step 1: 获取所有已配置 PushPlus token 的用户
+    // Step 1: 获取所有已配置 PushPlus token 的用户（不用 neq 过滤，在 JS 里判断）
     const allSettings = await supabaseGet(
       env,
       'user_settings',
-      `select=user_id,pushplus_token&pushplus_token=neq.&limit=1000`
+      `select=user_id,pushplus_token&limit=1000`
     );
 
     if (!Array.isArray(allSettings)) {
-      return jsonResponse({ error: 'failed to fetch user settings' }, 502);
+      return jsonResponse({ error: 'failed to fetch user settings', raw: String(allSettings) }, 502);
     }
 
     // Step 2: 遍历每个用户
@@ -160,14 +160,19 @@ export async function onRequest(context) {
       }
     }
 
+    // 调试：打印查询到的用户数
+    const withTokens = allSettings.filter(s => s.pushplus_token).length;
+    
     return jsonResponse({
       success: true,
       sent,
       skipped,
       errors,
       users: allSettings.length,
+      withTokens,
+      debug: { settingsTotal: allSettings.length, withTokens },
       time: new Date().toISOString(),
-      details: details.slice(0, 20), // 最多返回 20 条详情
+      details: details.slice(0, 20),
     });
   } catch (err) {
     console.error('cron-remind error:', err.message);
