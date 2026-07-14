@@ -1,11 +1,22 @@
 /**
- * 统一生成北京时间 ISO 字符串（+08:00）
+ * 统一生成北京时间 ISO 字符串
  * 解决 Supabase 项目时区（东京 UTC+9）导致的 8 小时偏移问题
+ * 输出格式: "2026-07-14T11:52:19+08:00"（Postgres timestamptz 可接受）
  * 替代所有 new Date().toISOString() 用于数据库存储的场景
  */
 export function beijingISO(date) {
   const d = date || new Date();
-  return d.toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' }).replace(' ', 'T') + ':00+08:00';
+  // 用 Intl 精确控制各字段，避免 locale 格式差异
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  });
+  // sv-SE 返回 "YYYY-MM-DD HH:mm:ss"
+  const s = fmt.format(d);
+  return s.replace(' ', 'T') + '+08:00';
 }
 
 /**

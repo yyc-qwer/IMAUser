@@ -351,7 +351,7 @@ export function useTasks() {
     const { error } = await supabase.from('task_types').insert(toSnakeCase({
       ...type,
       userId: user.id,
-      createdAt: beijingISO(),
+      // created_at 由数据库 DEFAULT now() 自动生成，不手动传入避免时区格式冲突
     }));
     if (error) {
       console.error('[addTaskType] 插入失败:', error.message, error.code);
