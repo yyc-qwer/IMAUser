@@ -80,8 +80,6 @@ export async function onRequest(context) {
     return jsonResponse({ error: 'missing SUPABASE_SERVICE_ROLE_KEY' }, 500);
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
   const diag = {};
   let sent = 0, skipped = 0, errCount = 0;
   const details = [];
@@ -111,28 +109,49 @@ export async function onRequest(context) {
     for (const s of allSettings) {
       if (!s.pushplus_token) continue;
 
+      // 查询该用户所有未完成任务（不过滤日期，避免 timestamptz 时区问题）
       const tasksRaw = await supabaseGet(env, 'tasks',
-        `select=id,title,end_date,completed&user_id=eq.${s.user_id}&end_date=lte.${tomorrow}&order=end_date.asc&limit=50`,
+        `select=id,title,end_date,completed,priority&user_id=eq.${s.user_id}&order=end_date.asc&limit=200`,
         diag
       );
 
       if (tasksRaw.error || !Array.isArray(tasksRaw)) continue;
 
+      const now = new Date();
+      const todayStr = now.toISOString().slice(0, 10); // YYYY-MM-DD UTC
+      // 明天同时间的 ISO 字符串，用于比较
+      const tomorrowISO = new Date(now.getTime() + 86400000).toISOString();
+
       const tasks = tasksRaw.filter(t => {
+        // 排除已完成的
         const c = t.completed;
-        return c !== true && c !== 1 && c !== 'true' && c !== '1';
+        if (c === true || c === 1 || c === 'true' || c === '1') return false;
+        if (!t.end_date) return false;
+
+        // 提取 end_date 的日期部分（兼容纯日期字符串和完整时间戳）
+        const d = typeof t.end_date === 'string' ? t.end_date.slice(0, 10) : '';
+        if (!d) return false;
+
+        // 只处理今天或明天到期的任务
+        const endDateObj = new Date(t.end_date);
+        return !isNaN(endDateObj.getTime()) && endDateObj <= new Date(tomorrowISO);
       });
+
+      diag.tasksRawCount = (tasksRaw || []).length;
+      diag.filteredTasksCount = tasks.length;
 
       for (const t of tasks) {
         if (!t.end_date) continue;
 
         const logs = await supabaseGet(env, 'reminded_log',
-          `task_id=eq.${t.id}&reminded_at=gte.${today}&limit=1`, diag);
-        
+          `task_id=eq.${t.id}&reminded_at=gte.${todayStr}&limit=1`, diag);
+
         if (Array.isArray(logs) && logs.length > 0) { skipped++; continue; }
 
-        const isToday = t.end_date === today;
-        const urgency = isToday ? '⚠️ 今天截止' : `📅 明天（${t.end_date}）截止`;
+        // 正确提取日期进行比较（兼容 timestamptz 和纯日期）
+        const taskDateStr = String(t.end_date).slice(0, 10);
+        const isToday = taskDateStr === todayStr;
+        const urgency = isToday ? '⚠️ 今天截止' : `📅 ${taskDateStr} 截止`;
         const priorityEmoji = { high: '🔴', medium: '🟡', low: '🟢' }[t.priority] || '';
 
         try {
