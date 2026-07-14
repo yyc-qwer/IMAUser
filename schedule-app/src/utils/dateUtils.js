@@ -1,4 +1,14 @@
 /**
+ * 统一生成北京时间 ISO 字符串（+08:00）
+ * 解决 Supabase 项目时区（东京 UTC+9）导致的 8 小时偏移问题
+ * 替代所有 new Date().toISOString() 用于数据库存储的场景
+ */
+export function beijingISO(date) {
+  const d = date || new Date();
+  return d.toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' }).replace(' ', 'T') + ':00+08:00';
+}
+
+/**
  * Compute days between two dates. Positive = future, negative = past.
  */
 export function daysBetween(a, b) {

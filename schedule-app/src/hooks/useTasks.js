@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './useAuth';
-import { sortByUrgency } from '../utils/dateUtils';
+import { sortByUrgency, beijingISO } from '../utils/dateUtils';
 
 // ===== Snake/Camel case helpers =====
 function toSnakeCase(obj) {
@@ -133,7 +133,7 @@ export async function processRepeatTasks(currentUser) {
           notified: false,
           reminderAt: task.reminderAt,
           repeatRule: task.repeatRule,
-          createdAt: new Date().toISOString(),
+          createdAt: beijingISO(),
         }));
       }
     }
@@ -282,7 +282,7 @@ export function useTasks() {
       notified: false,
       startDate: normalizeDate(task.startDate),
       endDate: normalizeDate(task.endDate),
-      createdAt: new Date().toISOString(),
+      createdAt: beijingISO(),
     });
     const { data, error } = await supabase
       .from('tasks')
@@ -341,7 +341,7 @@ export function useTasks() {
     const newCompleted = !task.completed;
     await supabase.from('tasks').update({
       completed: newCompleted,
-      completed_at: newCompleted ? new Date().toISOString() : null,
+      completed_at: newCompleted ? beijingISO() : null,
     }).eq('id', id);
     await refresh();
   };
@@ -351,7 +351,7 @@ export function useTasks() {
     await supabase.from('task_types').insert(toSnakeCase({
       ...type,
       userId: user.id,
-      createdAt: new Date().toISOString(),
+      createdAt: beijingISO(),
     }));
     await refresh();
   };
@@ -380,7 +380,7 @@ export function useTasks() {
       task_id: taskId,
       title,
       completed: false,
-      created_at: new Date().toISOString(),
+      created_at: beijingISO(),
     });
   };
 

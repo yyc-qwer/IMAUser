@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../supabaseClient";
+import { beijingISO } from "../utils/dateUtils";
 
 const PUSHPLUS_TOKEN_KEY = "imau_pushplus_token";
 
@@ -55,7 +56,7 @@ export default function useSettings(user) {
           user_id: user.id,
           pushplus_token: pushplusToken,
           remind_before: remindBefore,
-          updated_at: new Date().toISOString(),
+          updated_at: beijingISO(),
         },
         { onConflict: "user_id" }
       );
