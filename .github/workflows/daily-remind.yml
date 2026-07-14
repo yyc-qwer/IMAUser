@@ -1,0 +1,34 @@
+# IMAUser 每日微信提醒 - 自动定时任务
+# 每天 UTC 0:00（北京时间 8:00）自动执行
+name: Daily WeChat Reminder
+
+on:
+  schedule:
+    # 每天 UTC 0:00 = 北京时间 8:00
+    - cron: '0 0 * * *'
+  # 允许手动触发（方便测试）
+  workflow_dispatch:
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 发送提醒请求
+        run: |
+          echo "[$(date)] 开始执行每日提醒检查..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            "https://imauser.pages.dev/api/cron-remind?secret=${{ secrets.CRON_SECRET }}")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          echo "HTTP状态码: $HTTP_CODE"
+          echo "响应内容: $BODY"
+          echo "::notice title=提醒结果::$BODY"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::提醒请求失败! HTTP $HTTP_CODE"
+            exit 1
+          fi
+
+      - name: 输出结果摘要
+        run: |
+          echo "✅ 每日提醒执行完成"
+          echo "查看详细日志: https://github.com/${{ github.repository }}/actions"
