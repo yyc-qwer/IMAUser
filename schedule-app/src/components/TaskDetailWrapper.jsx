@@ -1,4 +1,5 @@
-import { useParams, useNavigate, useState, useEffect } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import TaskDetailPage from "./TaskDetailPage";
 import { supabase } from "../supabaseClient";
 
