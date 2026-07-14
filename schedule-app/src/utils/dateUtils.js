@@ -51,8 +51,11 @@ export function sortByUrgency(tasks) {
 
 /**
  * Format date to zh-CN locale string.
+ * 正确处理带/不带时区的各种日期格式
  */
 export function fmtDate(d) {
   if (!d) return "";
-  return new Date(d).toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return String(d);
+  return date.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
 }

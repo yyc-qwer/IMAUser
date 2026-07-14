@@ -269,12 +269,11 @@ export function useTasks() {
 
   const addTask = async (task) => {
     if (!user) return null;
-    // 统一日期格式：纯日期字符串存为当地日期的末尾时间（避免 timestamptz 时区偏移）
+    // 统一日期格式：纯日期字符串存为北京时间当天结束时间（显式+08:00避免服务器时区干扰）
     const normalizeDate = (d) => {
       if (!d) return null;
-      // 已经是完整 ISO 时间戳则保留，否则视为纯日期（补上当天结束时间）
       if (typeof d === 'string' && d.includes('T')) return d;
-      return d + 'T23:59:59';
+      return d + 'T23:59:59+08:00';
     };
     const payload = toSnakeCase({
       ...task,
@@ -301,11 +300,11 @@ export function useTasks() {
   };
 
   const updateTask = async (id, updates) => {
-    // 统一日期格式
+    // 统一日期格式（显式+08:00避免服务器时区干扰）
     const normalizeDate = (d) => {
       if (!d) return null;
       if (typeof d === 'string' && d.includes('T')) return d;
-      return d + 'T23:59:59';
+      return d + 'T23:59:59+08:00';
     };
     const normalized = { ...updates };
     if (normalized.startDate) normalized.startDate = normalizeDate(normalized.startDate);
