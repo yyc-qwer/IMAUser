@@ -348,11 +348,15 @@ export function useTasks() {
 
   const addTaskType = async (type) => {
     if (!user) return;
-    await supabase.from('task_types').insert(toSnakeCase({
+    const { error } = await supabase.from('task_types').insert(toSnakeCase({
       ...type,
       userId: user.id,
       createdAt: beijingISO(),
     }));
+    if (error) {
+      console.error('[addTaskType] 插入失败:', error.message, error.code);
+      throw error;
+    }
     await refresh();
   };
 

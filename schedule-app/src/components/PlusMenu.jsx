@@ -7,14 +7,14 @@ export default function PlusMenu({ onNewTask, taskTypes, newTypeName, setNewType
   const menuRef = useRef(null);
   const leaveTimer = useRef(null);
 
-  // 鼠标离开延迟关闭
+  // 鼠标离开延迟关闭（点击菜单内部按钮时不关闭）
   useEffect(() => {
     if (!open) return;
     const handler = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setOpen(false);
-        setShowTypeManager(false);
-      }
+      // 如果点击的是菜单内部元素（包括添加按钮），不关闭
+      if (menuRef.current && menuRef.current.contains(e.target)) return;
+      setOpen(false);
+      setShowTypeManager(false);
     };
     // 用 mousedown 而不是 click 避免和按钮冲突
     document.addEventListener('mousedown', handler);

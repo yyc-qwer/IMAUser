@@ -27,9 +27,13 @@ export default function TasksPage({
 
   const handleAddType = async () => {
     if (!newTypeName.trim()) return;
-    await addTaskType({ name: newTypeName.trim(), color: newTypeColor });
-    setNewTypeName("");
-    setNewTypeColor(COLORS[0]);
+    try {
+      await addTaskType({ name: newTypeName.trim(), color: newTypeColor });
+      setNewTypeName("");
+      setNewTypeColor(COLORS[0]);
+    } catch (err) {
+      alert('添加类型失败：' + (err.message || '未知错误，请检查网络或刷新重试'));
+    }
   };
 
   const filteredActive = activeTasks.filter(t => {
