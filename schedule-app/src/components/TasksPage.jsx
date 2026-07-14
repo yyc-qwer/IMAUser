@@ -213,8 +213,8 @@ function TaskCard({ task, typeName, color, done, onToggle, onEdit, onDelete, onE
     try {
       await sendPushPlus(pushplusToken, task.title,
         `<b>${task.title}</b><br/>`
-        + (task.endDate ? `截止：${task.endDate}<br/>` : '')
-        + (task.startDate ? `开始：${task.startDate}<br/>` : '')
+        + (task.endDate ? `截止：${fmtDate(task.endDate)}<br/>` : '')
+        + (task.startDate ? `开始：${fmtDate(task.startDate)}<br/>` : '')
         + '<br/><small>来自 IMAUser</small>'
       );
       setPushState('ok');

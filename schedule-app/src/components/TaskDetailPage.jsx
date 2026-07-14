@@ -1,6 +1,7 @@
 import { useState } from "react";
 import NotionBlockEditor from "./NotionBlockEditor";
 import { sendPushPlus } from "../hooks/useSettings";
+import { fmtDate } from "../utils/dateUtils";
 
 export default function TaskDetailPage({ task, isMobile, onBack, pushplusToken }) {
   const [pushStatus, setPushStatus] = useState(null); // null | 'loading' | 'success' | 'error'
@@ -13,7 +14,7 @@ export default function TaskDetailPage({ task, isMobile, onBack, pushplusToken }
     try {
       const content = `<b>${task.title}</b><br/>`
         + (task.priority ? `优先级：${priorityLabel}<br/>` : '')
-        + (task.endDate ? `截止日期：${task.endDate}<br/>` : '')
+        + (task.endDate ? `截止日期：${fmtDate(task.endDate)}<br/>` : '')
         + (task.notes ? `<br/>备注：${task.notes}` : '')
         + `<br/><small>来自 IMAUser 智能日程看板</small>`;
       await sendPushPlus(pushplusToken, task.title, content);
@@ -33,7 +34,7 @@ export default function TaskDetailPage({ task, isMobile, onBack, pushplusToken }
           <span className="task-priority-badge" style={{ background: priorityColor + "22", color: priorityColor, border: `1px solid ${priorityColor}44` }}>
             {priorityLabel}优先级
           </span>
-          {task.endDate && <span className="task-date-badge">截止: {task.endDate}</span>}
+          {task.endDate && <span className="task-date-badge">截止: {fmtDate(task.endDate)}</span>}
           {pushplusToken && (
             <button
               className={`push-wechat-btn ${pushStatus || ''}`}

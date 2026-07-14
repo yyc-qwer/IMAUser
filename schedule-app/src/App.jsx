@@ -134,9 +134,11 @@ function App() {
 
   const openEdit = (t) => {
     setEditingTask(t);
+    // 从 timestamptz 提取纯日期部分（type="date" input 只接受 YYYY-MM-DD）
+    const toDateOnly = (d) => { if (!d) return ""; return String(d).slice(0, 10); };
     setForm({
-      title: t.title, typeId: t.typeId ?? "", startDate: t.startDate ?? "",
-      endDate: t.endDate ?? "", notes: t.notes ?? "", priority: t.priority ?? "medium",
+      title: t.title, typeId: t.typeId ?? "", startDate: toDateOnly(t.startDate),
+      endDate: toDateOnly(t.endDate), notes: t.notes ?? "", priority: t.priority ?? "medium",
       reminderAt: t.reminderAt ? new Date(t.reminderAt).toISOString().slice(0, 16) : "",
       repeatRule: t.repeatRule || "none",
       source: t.source ?? "manual"

@@ -269,11 +269,20 @@ export function useTasks() {
 
   const addTask = async (task) => {
     if (!user) return null;
+    // 统一日期格式：纯日期字符串存为当地日期的末尾时间（避免 timestamptz 时区偏移）
+    const normalizeDate = (d) => {
+      if (!d) return null;
+      // 已经是完整 ISO 时间戳则保留，否则视为纯日期（补上当天结束时间）
+      if (typeof d === 'string' && d.includes('T')) return d;
+      return d + 'T23:59:59';
+    };
     const payload = toSnakeCase({
       ...task,
       userId: user.id,
       completed: false,
       notified: false,
+      startDate: normalizeDate(task.startDate),
+      endDate: normalizeDate(task.endDate),
       createdAt: new Date().toISOString(),
     });
     const { data, error } = await supabase
@@ -292,7 +301,16 @@ export function useTasks() {
   };
 
   const updateTask = async (id, updates) => {
-    const payload = toSnakeCase(updates);
+    // 统一日期格式
+    const normalizeDate = (d) => {
+      if (!d) return null;
+      if (typeof d === 'string' && d.includes('T')) return d;
+      return d + 'T23:59:59';
+    };
+    const normalized = { ...updates };
+    if (normalized.startDate) normalized.startDate = normalizeDate(normalized.startDate);
+    if (normalized.endDate) normalized.endDate = normalizeDate(normalized.endDate);
+    const payload = toSnakeCase(normalized);
     const { data, error } = await supabase
       .from('tasks')
       .update(payload)
