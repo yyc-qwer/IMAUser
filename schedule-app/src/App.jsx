@@ -148,6 +148,7 @@ function App() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // reminderAt 是 datetime-local，格式 "YYYY-MM-DDTHH:mm"，按北京时间处理
     const payload = {
       title: form.title,
       typeId: form.typeId ? Number(form.typeId) : null,
@@ -155,7 +156,7 @@ function App() {
       endDate: form.endDate || null,
       notes: form.notes,
       priority: form.priority,
-      reminderAt: form.reminderAt ? new Date(form.reminderAt).toISOString() : null,
+      reminderAt: form.reminderAt ? (form.reminderAt.includes('Z') || form.reminderAt.includes('+') ? new Date(form.reminderAt).toISOString() : form.reminderAt + ':00+08:00') : null,
       repeatRule: form.repeatRule,
       source: form.source,
     };
