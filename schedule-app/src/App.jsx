@@ -12,7 +12,7 @@ import ToastContainer, { toast } from "./components/Toast";
 import LoginPage from "./components/LoginPage";
 import AnalyticsPage from "./components/AnalyticsPage";
 import TasksPage from "./components/TasksPage";
-import PomodoroPage from "./components/PomodoroPage";
+import ToolboxPage from "./components/ToolboxPage";
 import ImportPage from "./components/ImportPage";
 import TaskDetailWrapper from "./components/TaskDetailWrapper";
 
@@ -20,8 +20,8 @@ function App() {
   const { user, loading: authLoading, signUp, signIn, signOut } = useAuth();
 
   const {
-    tasks, taskTypes, loading, activeTasks, completedTasks,
-    addTask, updateTask, deleteTask, toggleComplete,
+    tasks, taskTypes, loading, activeTasks, completedTasks, deletedTasks,
+    addTask, updateTask, deleteTask, restoreTask, permanentDelete, toggleComplete,
     addTaskType, deleteTaskType, refresh,
     getSubtasks, addSubtask, toggleSubtask, deleteSubtask,
     getWeeklyStats,
@@ -38,7 +38,7 @@ function App() {
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [notifEnabled, setNotifEnabled] = useState(isNotificationEnabled());
-  const [theme, setTheme] = useState(() => localStorage.getItem('ima_theme') || 'light');
+  const [theme, setTheme] = useState(() => localStorage.getItem('ima_theme') || 'dark');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef(null);
   const isMobile = useMediaQuery('(max-width: 768px)');
@@ -283,23 +283,9 @@ function App() {
 
   if (loading) return <Skeleton />;
 
-  // Analytics
-  const monthlyDistribution = {};
-  activeTasks.forEach(t => {
-    if (t.endDate) {
-      const key = new Date(t.endDate).toISOString().slice(0, 7);
-      monthlyDistribution[key] = (monthlyDistribution[key] || 0) + 1;
-    }
-  });
-  const sortedMonths = Object.entries(monthlyDistribution).sort((a, b) => a[0].localeCompare(b[0]));
-  const maxCount = Math.max(1, ...Object.values(monthlyDistribution));
-
+  // ===== Analytics helpers =====
   const typeDistribution = {};
   activeTasks.forEach(t => { const name = getTypeName(t.typeId); typeDistribution[name] = (typeDistribution[name] || 0) + 1; });
-  const maxTypeCount = Math.max(1, ...Object.values(typeDistribution));
-
-  const priorityCount = { high: 0, medium: 0, low: 0 };
-  activeTasks.forEach(t => { priorityCount[t.priority || 'medium'] = (priorityCount[t.priority || 'medium'] || 0) + 1; });
 
   return (
     <div className="app">
@@ -341,13 +327,13 @@ function App() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>
             <span className="nav-label">数据分析</span>
           </NavLink>
-          <NavLink to="/pomodoro" className={() => `nav-btn ${currentView === "pomodoro" ? "active" : ""}`}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <span className="nav-label">番茄钟</span>
+          <NavLink to="/toolbox" className={() => `nav-btn ${currentView === "toolbox" ? "active" : ""}`}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            <span className="nav-label">工具箱</span>
           </NavLink>
           <NavLink to="/import" className={() => `nav-btn ${currentView === "import" ? "active" : ""}`}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span className="nav-label">导入数据</span>
+            <span className="nav-label">数据处理</span>
           </NavLink>
           <NavLink to="/chat" className={() => `nav-btn ${currentView === "chat" ? "active" : ""}`}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
@@ -440,7 +426,9 @@ function App() {
           <Route path="/" element={
             <TasksPage
               tasks={tasks} taskTypes={taskTypes} activeTasks={activeTasks} completedTasks={completedTasks}
-              addTask={addTask} updateTask={updateTask} deleteTask={deleteTask} toggleComplete={toggleComplete}
+              deletedTasks={deletedTasks}
+              addTask={addTask} updateTask={updateTask} deleteTask={deleteTask} restoreTask={restoreTask}
+              permanentDelete={permanentDelete} toggleComplete={toggleComplete}
               addTaskType={addTaskType} deleteTaskType={deleteTaskType} refresh={refresh}
               getSubtasks={getSubtasks} addSubtask={addSubtask} toggleSubtask={toggleSubtask} deleteSubtask={deleteSubtask}
               openNew={openNew} openEdit={openEdit} getTypeName={getTypeName} getTypeColor={getTypeColor}
@@ -452,12 +440,10 @@ function App() {
               tasks={tasks} activeTasks={activeTasks} completedTasks={completedTasks}
               taskTypes={taskTypes} weeklyStats={weeklyStats}
               maxWeeklyCompleted={maxWeeklyCompleted} maxWeeklyCreated={maxWeeklyCreated}
-              sortedMonths={sortedMonths} maxCount={maxCount}
-              typeDistribution={typeDistribution} maxTypeCount={maxTypeCount}
-              priorityCount={priorityCount}
+              typeDistribution={typeDistribution}
             />
           } />
-          <Route path="/pomodoro" element={<PomodoroPage />} />
+          <Route path="/toolbox" element={<ToolboxPage />} />
           <Route path="/task/:taskId" element={<TaskDetailWrapper tasks={tasks} isMobile={isMobile} pushplusToken={pushplusToken} />} />
           <Route path="/schedule" element={
             <ScheduleView

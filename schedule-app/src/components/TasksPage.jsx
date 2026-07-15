@@ -9,8 +9,8 @@ import MonthView from "./MonthView";
 const COLORS = ["#5b9bd5", "#d9544f", "#3d7a5c", "#d4a853", "#7c6fb0", "#d4668e", "#3ba3b8", "#d4855e"];
 
 export default function TasksPage({
-  tasks, taskTypes, activeTasks, completedTasks,
-  addTask, updateTask, deleteTask, toggleComplete,
+  tasks, taskTypes, activeTasks, completedTasks, deletedTasks,
+  addTask, updateTask, deleteTask, restoreTask, permanentDelete, toggleComplete,
   addTaskType, deleteTaskType, refresh,
   getSubtasks, addSubtask, toggleSubtask, deleteSubtask,
   openNew, openEdit, getTypeName, getTypeColor,
@@ -24,6 +24,7 @@ export default function TasksPage({
   const [expandedTask, setExpandedTask] = useState(null);
   const [newTypeName, setNewTypeName] = useState("");
   const [newTypeColor, setNewTypeColor] = useState(COLORS[0]);
+  const [showTrash, setShowTrash] = useState(false);
 
   const handleAddType = async () => {
     if (!newTypeName.trim()) return;
@@ -156,6 +157,30 @@ export default function TasksPage({
             </div>
           </section>
         )}
+
+        {/* 回收站 */}
+        {deletedTasks.length > 0 && (
+          <section className="task-section trash-section">
+            <h3 className="section-title" style={{ cursor: 'pointer' }} onClick={() => setShowTrash(!showTrash)}>
+              🗑️ 回收站 ({deletedTasks.length}) {showTrash ? '▲' : '▼'}
+            </h3>
+            {showTrash && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {deletedTasks.map(tid => {
+                  const t = tasks.find(x => x.id === tid);
+                  if (!t) return null;
+                  return (
+                    <div key={tid} className="trash-item">
+                      <span className="trash-title">{t.title}</span>
+                      <button className="btn-secondary btn-sm" onClick={async () => { await restoreTask(tid); }}>恢复</button>
+                      <button className="btn-secondary btn-sm danger-btn" onClick={() => { if (window.confirm('确定永久删除？不可恢复！')) permanentDelete(tid); }}>永久删除</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
       </>)}
 
       {taskViewMode === "timeline" && (
@@ -206,9 +231,10 @@ export default function TasksPage({
 function TaskCard({ task, typeName, color, done, onToggle, onEdit, onDelete, onExpand, onOpenDetail, expanded, pushplusToken, subtaskProps }) {
   const cd = formatCountdown(task);
   const priorityLabel = { high: "高", medium: "中", low: "低" }[task.priority || "medium"];
-  const priorityColor = { high: "#d9544f", medium: "#d4855e", low: "#5b9bd5" }[task.priority || "medium"];
+  const priorityColor = { high: "#f85149", medium: "#f0883e", low: "#58a6ff" }[task.priority || "medium"];
   const repeatLabel = { daily: "每天", weekly: "每周", none: "" }[task.repeatRule || "none"];
-  const [pushState, setPushState] = useState(null); // null | 'sending' | 'ok' | 'err'
+  const [pushState, setPushState] = useState(null);
+  const [completing, setCompleting] = useState(false);
 
   const handlePush = async (e) => {
     e.stopPropagation();
@@ -227,6 +253,13 @@ function TaskCard({ task, typeName, color, done, onToggle, onEdit, onDelete, onE
       setPushState('err');
       setTimeout(() => setPushState(null), 2500);
     }
+  };
+
+  const handleToggle = async () => {
+    if (completing) return;
+    setCompleting(true);
+    try { await onToggle(); } catch {}
+    setCompleting(false);
   };
 
   return (
@@ -259,11 +292,11 @@ function TaskCard({ task, typeName, color, done, onToggle, onEdit, onDelete, onE
       </div>
       <div className="task-bottom">
         <span className={`countdown${cd.urgent ? " urgent" : ""}`}>{cd.text}</span>
-        <div className="task-bottom-actions">
-          <button className={`toggle-btn${done ? " done" : ""}`} onClick={onToggle}>
-            {done ? "↩ 恢复" : "✓ 完成"}
+        {!done && (
+          <button className={`toggle-btn${completing ? ' loading' : ''}`} onClick={handleToggle} disabled={completing}>
+            {completing ? '⏳ 处理中...' : '✓ 完成'}
           </button>
-        </div>
+        )}
       </div>
     </div>
   );

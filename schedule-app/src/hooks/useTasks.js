@@ -226,6 +226,15 @@ export function useTasks() {
   const [tasks, setTasks] = useState([]);
   const [taskTypes, setTaskTypes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deletedIds, setDeletedIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('ima_deleted_tasks') || '[]'); } catch { return []; }
+  });
+
+  // persist deleted ids
+  const syncDeleted = (ids) => {
+    localStorage.setItem('ima_deleted_tasks', JSON.stringify(ids));
+    setDeletedIds(ids);
+  };
 
   const refresh = useCallback(async () => {
     if (!user) { setLoading(false); return; }
@@ -243,10 +252,12 @@ export function useTasks() {
       .order('created_at', { ascending: false });
     if (typeError) console.error('fetch types error:', typeError);
 
-    setTasks(sortByUrgency(mapToCamelCase(taskData || [])));
+    const all = mapToCamelCase(taskData || []);
+    // 过滤掉软删除的
+    setTasks(sortByUrgency(all.filter(t => !deletedIds.includes(t.id))));
     setTaskTypes(mapToCamelCase(typeData || []));
     setLoading(false);
-  }, [user]);
+  }, [user, deletedIds]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -326,24 +337,39 @@ export function useTasks() {
   };
 
   const deleteTask = async (id) => {
-    await supabase.from('subtasks').delete().eq('task_id', id);
-    await supabase.from('tasks').delete().eq('id', id);
+    // 软删除：加入回收站，保留数据
+    const newIds = [...deletedIds, id];
+    syncDeleted(newIds);
+    setTasks(prev => prev.filter(t => t.id !== id));
+  };
+
+  const restoreTask = async (id) => {
+    const newIds = deletedIds.filter(did => did !== id);
+    syncDeleted(newIds);
     await refresh();
   };
 
+  const permanentDelete = async (id) => {
+    await supabase.from('subtasks').delete().eq('task_id', id);
+    await supabase.from('tasks').delete().eq('id', id);
+    syncDeleted(deletedIds.filter(did => did !== id));
+  };
+
   const toggleComplete = async (id) => {
-    const { data: task } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (!task) return;
-    const newCompleted = !task.completed;
-    await supabase.from('tasks').update({
-      completed: newCompleted,
-      completed_at: newCompleted ? beijingISO() : null,
-    }).eq('id', id);
-    await refresh();
+    // 乐观更新：立即切换本地状态
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed, completedAt: !t.completed ? beijingISO() : null } : t));
+    try {
+      const { data: task } = await supabase.from('tasks').select('*').eq('id', id).single();
+      if (!task) return;
+      const newCompleted = !task.completed;
+      await supabase.from('tasks').update({
+        completed: newCompleted,
+        completed_at: newCompleted ? beijingISO() : null,
+      }).eq('id', id);
+    } catch {
+      // 回滚
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed, completedAt: !t.completed ? null : beijingISO() } : t));
+    }
   };
 
   const addTaskType = async (type) => {
@@ -428,10 +454,11 @@ export function useTasks() {
 
   const activeTasks = tasks.filter(t => !t.completed);
   const completedTasks = tasks.filter(t => t.completed);
+  const deletedTasks = deletedIds;
 
   return {
-    tasks, taskTypes, loading, activeTasks, completedTasks,
-    addTask, updateTask, deleteTask, toggleComplete,
+    tasks, taskTypes, loading, activeTasks, completedTasks, deletedTasks,
+    addTask, updateTask, deleteTask, restoreTask, permanentDelete, toggleComplete,
     addTaskType, deleteTaskType, refresh,
     getSubtasks, addSubtask, toggleSubtask, deleteSubtask,
     getWeeklyStats,
