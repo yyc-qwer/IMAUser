@@ -3,16 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>日程管理 - 智能任务看板</title>
-    <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
-    <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700,800&display=swap" rel="stylesheet" />
+    <title>IMAUser - 智能日程看板</title>
     <style>
-      html { background: #fcfaf7; }
-      html[data-theme="dark"] { background: #171512; }
+      html { background: #0d1117; color: #e6edf3; }
+      html[data-theme="light"] { background: #f6f8fa; color: #1f2328; }
     </style>
     <script>
       (function() {
-        var t = localStorage.getItem('ima_theme') || 'light';
+        var t = localStorage.getItem('ima_theme') || 'dark';
         document.documentElement.setAttribute('data-theme', t);
       })();
     </script>

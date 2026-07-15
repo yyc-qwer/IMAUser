@@ -9,7 +9,7 @@ import MonthView from "./MonthView";
 const COLORS = ["#5b9bd5", "#d9544f", "#3d7a5c", "#d4a853", "#7c6fb0", "#d4668e", "#3ba3b8", "#d4855e"];
 
 export default function TasksPage({
-  tasks, taskTypes, activeTasks, completedTasks, deletedTasks,
+  tasks, taskTypes, activeTasks, completedTasks, trashTasks,
   addTask, updateTask, deleteTask, restoreTask, permanentDelete, toggleComplete,
   addTaskType, deleteTaskType, refresh,
   getSubtasks, addSubtask, toggleSubtask, deleteSubtask,
@@ -158,25 +158,21 @@ export default function TasksPage({
           </section>
         )}
 
-        {/* 回收站 */}
-        {deletedTasks.length > 0 && (
+        {/* 回收站 — 用 trashTasks 完整对象 */}
+        {trashTasks.length > 0 && (
           <section className="task-section trash-section">
             <h3 className="section-title" style={{ cursor: 'pointer' }} onClick={() => setShowTrash(!showTrash)}>
-              🗑️ 回收站 ({deletedTasks.length}) {showTrash ? '▲' : '▼'}
+              🗑️ 回收站 ({trashTasks.length}) {showTrash ? '▲' : '▼'}
             </h3>
             {showTrash && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {deletedTasks.map(tid => {
-                  const t = tasks.find(x => x.id === tid);
-                  if (!t) return null;
-                  return (
-                    <div key={tid} className="trash-item">
-                      <span className="trash-title">{t.title}</span>
-                      <button className="btn-secondary btn-sm" onClick={async () => { await restoreTask(tid); }}>恢复</button>
-                      <button className="btn-secondary btn-sm danger-btn" onClick={() => { if (window.confirm('确定永久删除？不可恢复！')) permanentDelete(tid); }}>永久删除</button>
-                    </div>
-                  );
-                })}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {trashTasks.map(t => (
+                  <div key={t.id} className="trash-item">
+                    <span className="trash-title">{t.title}</span>
+                    <button className="btn-secondary btn-sm" onClick={() => restoreTask(t.id)}>恢复</button>
+                    <button className="btn-secondary btn-sm danger-btn" onClick={() => { if (confirm('确定永久删除？')) permanentDelete(t.id); }}>永久删除</button>
+                  </div>
+                ))}
               </div>
             )}
           </section>

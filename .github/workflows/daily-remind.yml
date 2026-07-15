@@ -1,12 +1,11 @@
-# IMAUser 每日微信提醒 - 自动定时任务
-# 每天 UTC 0:00（北京时间 8:00）自动执行
-name: Daily WeChat Reminder
+# IMAUser 智能微信提醒 - 自动定时任务
+# 每 30 分钟检查一次到期任务并推送微信提醒
+name: WeChat Reminder
 
 on:
   schedule:
-    # 每天 UTC 0:00 = 北京时间 8:00
-    - cron: '0 0 * * *'
-  # 允许手动触发（方便测试）
+    # 每 30 分钟执行一次
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:

@@ -25,8 +25,8 @@
 
   --danger:         #f85149;
   --danger-light:   #2d1318;
-  --success:        #3fb950;
-  --success-light:  #14271c;
+  --success:        #2f81f7;
+  --success-light:  #13233a;
   --warning:        #d29922;
   --warning-light:  #2a2410;
 
@@ -159,7 +159,7 @@ button:active { transform: scale(0.98); }
 .sidebar.collapsed .logo svg { width: 22px; height: 22px; }
 .sidebar.expanded .logo,
 .sidebar.collapsed:hover .logo { padding-left: 0; }
-.logo svg { flex-shrink: 0; width: 22px; height: 22px; color: var(--primary); }
+.logo svg { flex-shrink: 0; width: 20px; height: 20px; color: var(--primary); }
 
 .logo-text {
   white-space: nowrap;
@@ -189,36 +189,34 @@ button:active { transform: scale(0.98); }
 }
 
 .nav-btn {
-  display: flex; align-items: center; gap: 14px;
-  padding: 12px 16px; border: none;
-  border-radius: 12px;
-  color: var(--text2); font-size: 15px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; border: none;
+  border-radius: 8px;
+  color: var(--text2); font-size: 13px; line-height: 1;
   font-weight: 500;
-  transition: background 0.2s, color 0.2s;
+  transition: background 0.15s, color 0.15s;
   white-space: nowrap;
-  background: none;
-  box-sizing: border-box;
+  background: none; text-decoration: none !important;
   width: 100%;
 }
 .nav-btn:hover { background: var(--surface2); color: var(--text); }
 .nav-btn.active {
   background: var(--primary-light); color: var(--primary);
-  font-weight: 700;
+  font-weight: 600;
 }
 
-/* SVG icons stay same size always — never shrink */
 .nav-btn svg {
-  width: 22px; height: 22px; flex-shrink: 0;
+  width: 20px; height: 20px; flex-shrink: 0;
 }
+a.nav-btn, a.nav-btn:hover, a.nav-btn:active, a.nav-btn:visited { text-decoration: none !important; }
 
 .nav-label {
-  white-space: nowrap;
-  overflow: hidden;
-  transition: opacity 0.4s var(--ease-out), max-width 0.4s var(--ease-out);
+  white-space: nowrap; overflow: hidden;
+  transition: opacity 0.3s var(--ease-out), max-width 0.3s var(--ease-out);
 }
 .sidebar.collapsed .nav-label { opacity: 0; max-width: 0; }
 .sidebar.expanded .nav-label,
-.sidebar.collapsed:hover .nav-label { opacity: 1; max-width: 140px; }
+.sidebar.collapsed:hover .nav-label { opacity: 1; max-width: 120px; }
 
 /* Sidebar sections */
 .sidebar-section {
@@ -271,14 +269,14 @@ button:active { transform: scale(0.98); }
   flex-shrink: 0;
 }
 .settings-btn {
-  display: flex; align-items: center; gap: 14px;
-  padding: 12px 16px; border: none; border-radius: 12px;
-  background: none; color: var(--text2); font-size: 15px; font-weight: 500;
-  cursor: pointer; white-space: nowrap; width: 100%;
-  transition: background 0.2s, color 0.2s;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; border: none; border-radius: 8px;
+  background: none; color: var(--text2); font-size: 13px; line-height: 1;
+  font-weight: 500; cursor: pointer; white-space: nowrap; width: 100%;
+  transition: background 0.15s, color 0.15s;
 }
 .settings-btn:hover { background: var(--surface2); color: var(--text); }
-.settings-btn svg { width: 22px; height: 22px; flex-shrink: 0; }
+.settings-btn svg { width: 20px; height: 20px; flex-shrink: 0; }
 .settings-btn .nav-label {
   white-space: nowrap; overflow: hidden;
   transition: opacity 0.4s var(--ease-out), max-width 0.4s var(--ease-out);
@@ -290,13 +288,14 @@ button:active { transform: scale(0.98); }
 
 /* Settings Dropdown */
 .settings-dropdown {
-  position: absolute; bottom: 100%; left: 0; right: 0;
+  position: absolute; bottom: 100%;
+  left: 0; right: 0; min-width: 180px; width: max-content;
   margin-bottom: 8px;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 16px; padding: 6px;
+  border-radius: var(--radius); padding: 4px;
   box-shadow: var(--shadow-lg);
-  opacity: 0; transform: translateY(8px); pointer-events: none;
-  transition: opacity 0.2s var(--ease-out), transform 0.2s var(--ease-out);
+  opacity: 0; transform: translateY(4px); pointer-events: none;
+  transition: opacity 0.15s, transform 0.15s;
   z-index: 200;
 }
 .settings-dropdown.open { opacity: 1; transform: translateY(0); pointer-events: auto; }
