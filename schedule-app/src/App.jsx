@@ -9,11 +9,13 @@ import SplashScreen from "./components/SplashScreen";
 import Skeleton from "./components/Skeleton";
 import ToastContainer, { toast } from "./components/Toast";
 import LoginPage from "./components/LoginPage";
-import AnalyticsPage from "./components/AnalyticsPage";
 import TasksPage from "./components/TasksPage";
 import ImportPage from "./components/ImportPage";
 import ToolboxPage from "./components/ToolboxPage";
+import AnalyticsPage from "./components/AnalyticsPage";
 import TaskDetailWrapper from "./components/TaskDetailWrapper";
+import CourseImportPage from "./components/CourseImportPage";
+import TodayView from "./components/TodayView";
 
 function App() {
   const { user, loading: authLoading, signUp, signIn, signOut } = useAuth();
@@ -25,8 +27,9 @@ function App() {
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [notifEnabled, setNotifEnabled] = useState(isNotificationEnabled());
-  const [theme, setTheme] = useState(() => localStorage.getItem('ima_theme') || 'dark');
+  const [theme, setTheme] = useState(() => localStorage.getItem('ima_theme') || 'light');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const settingsRef = useRef(null);
   const isMobile = useMediaQuery('(max-width: 768px)');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -62,7 +65,15 @@ function App() {
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
   const openNew = () => { setEditingTask(null); setForm({ title: "", typeId: taskTypes[0]?.id || "", startDate: "", endDate: "", notes: "", priority: "medium", reminderAt: "", repeatRule: "none", source: "manual" }); setShowForm(true); };
   const openEdit = (t) => { setEditingTask(t); const toDateOnly = (d) => d ? String(d).slice(0, 10) : ""; setForm({ title: t.title, typeId: t.typeId ?? "", startDate: toDateOnly(t.startDate), endDate: toDateOnly(t.endDate), notes: t.notes ?? "", priority: t.priority ?? "medium", reminderAt: t.reminderAt ? new Date(t.reminderAt).toISOString().slice(0, 16) : "", repeatRule: t.repeatRule || "none", source: t.source ?? "manual" }); setShowForm(true); };
-  const handleSubmit = async (e) => { e.preventDefault(); const payload = { title: form.title, typeId: form.typeId ? Number(form.typeId) : null, startDate: form.startDate || null, endDate: form.endDate || null, notes: form.notes, priority: form.priority, reminderAt: form.reminderAt ? (form.reminderAt.includes('Z') || form.reminderAt.includes('+') ? form.reminderAt : form.reminderAt + ':00+08:00') : null, repeatRule: form.repeatRule, source: form.source }; if (editingTask) await updateTask(editingTask.id, payload); else await addTask(payload); setShowForm(false); };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
+    const payload = { title: form.title, typeId: form.typeId ? Number(form.typeId) : null, startDate: form.startDate || null, endDate: form.endDate || null, notes: form.notes, priority: form.priority, reminderAt: form.reminderAt ? (form.reminderAt.includes('Z') || form.reminderAt.includes('+') ? form.reminderAt : form.reminderAt + ':00+08:00') : null, repeatRule: form.repeatRule, source: form.source };
+    if (editingTask) await updateTask(editingTask.id, payload); else await addTask(payload);
+    setSubmitting(false);
+    setShowForm(false);
+  };
 
   const getTypeName = (typeId) => taskTypes.find(t => t.id === typeId)?.name ?? "未分类";
   const getTypeColor = (typeId) => taskTypes.find(t => t.id === typeId)?.color ?? "#6b7280";
@@ -70,6 +81,50 @@ function App() {
   const handleToggleNotif = async () => {
     if (!notifEnabled) { const granted = await requestNotificationPermission(); if (granted) { setNotificationEnabled(true); setNotifEnabled(true); toast('通知已开启', 'success'); } else toast('通知权限被拒绝', 'error'); }
     else { setNotificationEnabled(false); setNotifEnabled(false); }
+  };
+
+  // 从剪贴板导入任务
+  const handleImport = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text.trim()) { toast('剪贴板为空', 'error'); return; }
+      const lines = text.trim().split('\n').filter(l => l.trim());
+      let count = 0;
+      for (const line of lines) {
+        await addTask({ title: line.trim(), typeId: taskTypes[0]?.id || null, priority: 'medium', source: 'import' });
+        count++;
+      }
+      toast(`成功导入 ${count} 条任务`, 'success');
+    } catch (e) {
+      toast('导入失败：' + e.message, 'error');
+    }
+  };
+
+  // 从浏览器存储拉取
+  const handleStoragePull = async () => {
+    try {
+      const data = localStorage.getItem('imau_tasks_import');
+      if (!data) { toast('没有找到待导入数据', 'error'); return; }
+      const arr = JSON.parse(data);
+      if (!Array.isArray(arr) || arr.length === 0) { toast('没有有效数据', 'error'); return; }
+      let count = 0;
+      for (const item of arr) {
+        await addTask({
+          title: item.title || '未命名任务',
+          typeId: taskTypes[0]?.id || null,
+          startDate: item.startDate || null,
+          endDate: item.endDate || null,
+          notes: item.notes || '',
+          priority: item.priority || 'medium',
+          source: 'storage-import'
+        });
+        count++;
+      }
+      localStorage.removeItem('imau_tasks_import');
+      toast(`成功拉取 ${count} 条任务`, 'success');
+    } catch (e) {
+      toast('拉取失败：' + e.message, 'error');
+    }
   };
 
   if (showSplash) return <SplashScreen onEnter={() => setShowSplash(false)} />;
@@ -84,33 +139,30 @@ function App() {
         <div className="sidebar-inner">
         <div className="sidebar-header">
           <h1 className="logo">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             <span className="logo-text">日程看板</span>
           </h1>
-          <button className="sidebar-pin-btn" title={sidebarExpanded ? '收起' : '固定展开'} onClick={() => setSidebarExpanded(!sidebarExpanded)}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">{sidebarExpanded ? <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></> : <><line x1="17" y1="10" x2="3" y2="10"/><polyline points="10 3 3 10 10 17"/></>}</svg>
-          </button>
         </div>
         <nav>
-          <NavLink to="/" className={() => `nav-btn ${(currentView === "tasks" || currentView === "taskDetail") ? "active" : ""}`} end>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            <span className="nav-label">任务列表</span>
+          <NavLink to="/" end className={({ isActive }) => `nav-btn ${isActive ? "active" : ""}`}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span className="nav-label">今日</span>
           </NavLink>
-          <NavLink to="/analytics" className={() => `nav-btn ${currentView === "analytics" ? "active" : ""}`}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>
-            <span className="nav-label">数据分析</span>
+          <NavLink to="/tasks" className={({ isActive }) => `nav-btn ${isActive ? "active" : ""}`}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            <span className="nav-label">全部任务</span>
           </NavLink>
-          <NavLink to="/chat" className={() => `nav-btn ${currentView === "chat" ? "active" : ""}`}>
+          <NavLink to="/chat" className={({ isActive }) => `nav-btn ${isActive ? "active" : ""}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
             <span className="nav-label">AI 助手</span>
           </NavLink>
-          <NavLink to="/toolbox" className={() => `nav-btn ${currentView === "toolbox" ? "active" : ""}`}>
+          <NavLink to="/analytics" className={({ isActive }) => `nav-btn ${isActive ? "active" : ""}`}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+            <span className="nav-label">数据分析</span>
+          </NavLink>
+          <NavLink to="/toolbox" className={({ isActive }) => `nav-btn ${isActive ? "active" : ""}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
             <span className="nav-label">工具箱</span>
-          </NavLink>
-          <NavLink to="/import" className={() => `nav-btn ${currentView === "import" ? "active" : ""}`}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span className="nav-label">数据处理</span>
           </NavLink>
         </nav>
 
@@ -125,7 +177,17 @@ function App() {
           <div className="stat"><span className="stat-val">{completedTasks.length}</span><span className="stat-label">已完成</span></div>
         </div>
 
-        <div className="settings-wrapper" ref={settingsRef}>
+        <div className="sidebar-bottom">
+          <button className="sidebar-pin-btn" title={sidebarExpanded ? '收起侧边栏' : '固定展开侧边栏'} onClick={() => setSidebarExpanded(!sidebarExpanded)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              {sidebarExpanded
+                ? <><line x1="3" y1="12" x2="21" y2="12"/><polyline points="8 5 3 12 8 19"/></>
+                : <><line x1="3" y1="12" x2="21" y2="12"/><polyline points="14 5 19 12 14 19"/></>
+              }
+            </svg>
+            <span className="nav-label">固定侧边栏</span>
+          </button>
+          <div className="settings-wrapper" ref={settingsRef}>
           <div className={`settings-dropdown ${settingsOpen ? 'open' : ''}`} onClick={e => e.stopPropagation()}>
             <div className="settings-dropdown-header"><div className="settings-dropdown-email" title={user.email}>{user.email}</div></div>
             <div className="settings-item" onClick={toggleTheme}>
@@ -160,17 +222,21 @@ function App() {
           </button>
         </div>
         </div>
+        </div>
       </aside>
 
       <main className={`main ${sidebarExpanded ? 'pushed' : ''}`}>
         {isMobile && <button className="mobile-menu-btn" onClick={() => setMobileSidebarOpen(true)} aria-label="菜单"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>}
         <Routes>
-          <Route path="/" element={<TasksPage tasks={tasks} taskTypes={taskTypes} activeTasks={activeTasks} completedTasks={completedTasks} trashTasks={trashTasks} addTask={addTask} updateTask={updateTask} deleteTask={deleteTask} restoreTask={restoreTask} permanentDelete={permanentDelete} toggleComplete={toggleComplete} addTaskType={addTaskType} deleteTaskType={deleteTaskType} refresh={refresh} getSubtasks={getSubtasks} addSubtask={addSubtask} toggleSubtask={toggleSubtask} deleteSubtask={deleteSubtask} openNew={openNew} openEdit={openEdit} getTypeName={getTypeName} getTypeColor={getTypeColor} pushplusToken={pushplusToken} />} />
-          <Route path="/analytics" element={<AnalyticsPage activeTasks={activeTasks} completedTasks={completedTasks} />} />
+          <Route path="/" element={<TodayView tasks={tasks} taskTypes={taskTypes} getTypeName={getTypeName} getTypeColor={getTypeColor} onOpenDetail={(t) => navigate("/task/" + t.id)} onOpenNew={openNew} addTask={addTask} />} />
+          <Route path="/tasks" element={<TasksPage tasks={tasks} taskTypes={taskTypes} activeTasks={activeTasks} completedTasks={completedTasks} trashTasks={trashTasks} addTask={addTask} updateTask={updateTask} deleteTask={deleteTask} restoreTask={restoreTask} permanentDelete={permanentDelete} toggleComplete={toggleComplete} addTaskType={addTaskType} deleteTaskType={deleteTaskType} refresh={refresh} getSubtasks={getSubtasks} addSubtask={addSubtask} toggleSubtask={toggleSubtask} deleteSubtask={deleteSubtask} openNew={openNew} openEdit={openEdit} getTypeName={getTypeName} getTypeColor={getTypeColor} pushplusToken={pushplusToken} />} />
           <Route path="/chat" element={<AIChat tasks={tasks} taskTypes={taskTypes} addTask={addTask} updateTask={updateTask} deleteTask={deleteTask} toggleComplete={toggleComplete} refresh={refresh} />} />
+
           <Route path="/toolbox" element={<ToolboxPage />} />
+          <Route path="/analytics" element={<AnalyticsPage tasks={tasks} taskTypes={taskTypes} activeTasks={activeTasks} completedTasks={completedTasks} getTypeName={getTypeName} />} />
           <Route path="/import" element={<ImportPage tasks={tasks} taskTypes={taskTypes} addTask={addTask} getTypeName={getTypeName} handleImport={handleImport} handleStoragePull={handleStoragePull} />} />
-          <Route path="/task/:taskId" element={<TaskDetailWrapper tasks={tasks} isMobile={isMobile} pushplusToken={pushplusToken} />} />
+          <Route path="/course-import" element={<CourseImportPage addTask={addTask} deleteTask={deleteTask} tasks={tasks} refresh={refresh} toast={toast} />} />
+          <Route path="/task/:taskId" element={<TaskDetailWrapper tasks={tasks} isMobile={isMobile} pushplusToken={pushplusToken} toggleComplete={toggleComplete} deleteTask={deleteTask} updateTask={updateTask} getTypeName={getTypeName} getTypeColor={getTypeColor} />} />
         </Routes>
 
         {showForm && (
@@ -193,7 +259,7 @@ function App() {
                   <div><label>提醒</label><input type="datetime-local" value={form.reminderAt} onChange={e => setForm({ ...form, reminderAt: e.target.value })} /></div>
                 </div>
                 <label>备注</label><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="可选备注" rows={2} />
-                <div className="form-actions"><button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>取消</button><button type="submit" className="btn-primary">{editingTask ? "保存" : "创建"}</button></div>
+                <div className="form-actions"><button type="button" className="btn-secondary" onClick={() => setShowForm(false)} disabled={submitting}>取消</button><button type="submit" className="btn-primary" disabled={submitting}>{submitting ? '处理中...' : (editingTask ? "保存" : "创建")}</button></div>
               </form>
             </div>
           </div>

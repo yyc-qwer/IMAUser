@@ -46,8 +46,13 @@ export default function MonthView({
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const dayTasks = tasks.filter(t => {
       if (!t.startDate && !t.endDate) return false;
-      if (t.startDate && t.startDate > dateStr) return false;
-      if (t.endDate && t.endDate < dateStr) return false;
+      // 单日任务：只有 startDate 或 startDate === endDate
+      if (!t.endDate || t.startDate === t.endDate) {
+        return t.startDate === dateStr;
+      }
+      // 跨天任务：dateStr 在 [startDate, endDate] 范围内
+      if (t.startDate > dateStr) return false;
+      if (t.endDate < dateStr) return false;
       return true;
     });
     cells.push({

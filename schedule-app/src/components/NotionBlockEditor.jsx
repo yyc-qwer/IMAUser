@@ -4,6 +4,7 @@ import { useBlocks } from '../hooks/useBlocks';
 export default function NotionBlockEditor({ taskId, isMobile }) {
   const { getBlocks, addBlock, updateBlock, deleteBlock, reorderBlocks } = useBlocks();
   const [blocks, setBlocks] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [hoverId, setHoverId] = useState(null);
   const [focusId, setFocusId] = useState(null);
   const [convertMenu, setConvertMenu] = useState(null);
@@ -118,6 +119,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
   const load = useCallback(async () => {
     if (loadedRef.current) return;
     loadedRef.current = true;
+    setLoading(true);
     const list = await getBlocks(taskId);
     if (list.length === 0) {
       const h = await addBlock(taskId, 'heading', '', 0);
@@ -128,6 +130,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
     } else {
       setBlocks(list);
     }
+    setLoading(false);
   }, [taskId, getBlocks, addBlock]);
 
   useEffect(() => {
@@ -746,7 +749,7 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
           </div>
         );
       case 'divider':
-        return <div className="block-divider"><hr /></div>;
+        return <div className="block-divider notion-block-no-hover"><hr /></div>;
       default:
         return <input {...commonProps} />;
     }
@@ -768,7 +771,13 @@ export default function NotionBlockEditor({ taskId, isMobile }) {
       onTouchMove={isMobile ? handleTouchMove : undefined}
       onTouchEnd={isMobile ? handleTouchEnd : undefined}
     >
-      {visibleBlocks.map((vb, vi) => {
+      {loading && (
+        <div className="notion-loading">
+          <div className="notion-loading-spinner" />
+          <span>加载中...</span>
+        </div>
+      )}
+      {!loading && visibleBlocks.map((vb, vi) => {
         const b = vb.block;
         const isBeingDragged = touchDrag && touchDrag.id === b.id;
         const showMarkerAbove = touchDrag && touchDrag.toVisibleIdx === vi && touchDrag.fromVisibleIdx !== vi;

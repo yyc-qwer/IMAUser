@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { formatCountdown, fmtDate } from "../utils/dateUtils";
-import { sendPushPlus } from "../hooks/useSettings";
+import { fmtDate } from "../utils/dateUtils";
 import PlusMenu from "./PlusMenu";
 import TimelineMemoView from "./TimelineMemoView";
 import MonthView from "./MonthView";
 
 const COLORS = ["#5b9bd5", "#d9544f", "#3d7a5c", "#d4a853", "#7c6fb0", "#d4668e", "#3ba3b8", "#d4855e"];
+const MODES = ["list", "timeline", "month"];
 
 export default function TasksPage({
   tasks, taskTypes, activeTasks, completedTasks, trashTasks,
@@ -25,6 +25,25 @@ export default function TasksPage({
   const [newTypeName, setNewTypeName] = useState("");
   const [newTypeColor, setNewTypeColor] = useState(COLORS[0]);
   const [showTrash, setShowTrash] = useState(false);
+
+  const switchView = useCallback((dir) => {
+    setTaskViewMode(prev => {
+      const idx = MODES.indexOf(prev);
+      const next = (idx + dir + MODES.length) % MODES.length;
+      return MODES[next];
+    });
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { e.preventDefault(); switchView(1); }
+      else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { e.preventDefault(); switchView(-1); }
+      else if (e.key === 'Enter' && taskViewMode === 'list') { e.preventDefault(); openNew(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [switchView, taskViewMode, openNew]);
 
   const handleAddType = async () => {
     if (!newTypeName.trim()) return;
@@ -79,12 +98,8 @@ export default function TasksPage({
           <button
             className="btn-secondary view-toggle-btn"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap' }}
-            onClick={() => {
-              const modes = ["list", "timeline", "month"];
-              const idx = modes.indexOf(taskViewMode);
-              setTaskViewMode(modes[(idx + 1) % modes.length]);
-            }}
-            title={`当前：${taskViewMode === "list" ? "列表" : taskViewMode === "timeline" ? "日程" : "月份"} → 点击切换`}
+            onClick={() => switchView(1)}
+            title={`当前：${taskViewMode === "list" ? "列表" : taskViewMode === "timeline" ? "日程" : "月份"} → 点击/按D切换 (A/D 或 ←/→)`}
           >
             {taskViewMode === "list" && (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
@@ -130,12 +145,9 @@ export default function TasksPage({
             <div className="task-grid">
               {filteredActive.map(t => (
                 <TaskCard key={t.id} task={t} typeName={getTypeName(t.typeId)} color={getTypeColor(t.typeId)}
-                  expanded={expandedTask === t.id}
                   onToggle={() => toggleComplete(t.id)} onEdit={() => openEdit(t)} onDelete={() => deleteTask(t.id)}
-                  onExpand={() => setExpandedTask(expandedTask === t.id ? null : t.id)}
                   onOpenDetail={() => navigate("/task/" + t.id)}
-                  pushplusToken={pushplusToken}
-                  subtaskProps={{ getSubtasks, addSubtask, toggleSubtask, deleteSubtask }} />
+                  pushplusToken={pushplusToken} />
               ))}
             </div>
           </section>
@@ -147,12 +159,9 @@ export default function TasksPage({
             <div className="task-grid">
               {filteredCompleted.map(t => (
                 <TaskCard key={t.id} task={t} typeName={getTypeName(t.typeId)} color={getTypeColor(t.typeId)} done
-                  expanded={expandedTask === t.id}
                   onToggle={() => toggleComplete(t.id)} onEdit={() => openEdit(t)} onDelete={() => deleteTask(t.id)}
-                  onExpand={() => setExpandedTask(expandedTask === t.id ? null : t.id)}
                   onOpenDetail={() => navigate("/task/" + t.id)}
-                  pushplusToken={pushplusToken}
-                  subtaskProps={{ getSubtasks, addSubtask, toggleSubtask, deleteSubtask }} />
+                  pushplusToken={pushplusToken} />
               ))}
             </div>
           </section>
@@ -224,32 +233,8 @@ export default function TasksPage({
   );
 }
 
-function TaskCard({ task, typeName, color, done, onToggle, onEdit, onDelete, onExpand, onOpenDetail, expanded, pushplusToken, subtaskProps }) {
-  const cd = formatCountdown(task);
-  const priorityLabel = { high: "高", medium: "中", low: "低" }[task.priority || "medium"];
-  const priorityColor = { high: "#f85149", medium: "#f0883e", low: "#58a6ff" }[task.priority || "medium"];
-  const repeatLabel = { daily: "每天", weekly: "每周", none: "" }[task.repeatRule || "none"];
-  const [pushState, setPushState] = useState(null);
+function TaskCard({ task, typeName, color, done, onToggle, onEdit, onDelete, onOpenDetail, pushplusToken }) {
   const [completing, setCompleting] = useState(false);
-
-  const handlePush = async (e) => {
-    e.stopPropagation();
-    if (!pushplusToken || pushState === 'sending') return;
-    setPushState('sending');
-    try {
-      await sendPushPlus(pushplusToken, task.title,
-        `<b>${task.title}</b><br/>`
-        + (task.endDate ? `截止：${fmtDate(task.endDate)}<br/>` : '')
-        + (task.startDate ? `开始：${fmtDate(task.startDate)}<br/>` : '')
-        + '<br/><small>来自 IMAUser</small>'
-      );
-      setPushState('ok');
-      setTimeout(() => setPushState(null), 2000);
-    } catch {
-      setPushState('err');
-      setTimeout(() => setPushState(null), 2500);
-    }
-  };
 
   const handleToggle = async () => {
     if (completing) return;
@@ -258,20 +243,26 @@ function TaskCard({ task, typeName, color, done, onToggle, onEdit, onDelete, onE
     setCompleting(false);
   };
 
+  const timeStr = task.startDate
+    ? (task.endDate && task.endDate !== task.startDate
+      ? `${fmtDate(task.startDate)} ~ ${fmtDate(task.endDate)}`
+      : fmtDate(task.startDate))
+    : '';
+
   return (
     <div className={`task-card${done ? " done" : ""}`} style={{ borderLeftColor: done ? undefined : color }}>
       <div className="task-card-top">
-        <div className="task-badges">
-          <span className="task-type-badge" style={{ background: color }}>{typeName}</span>
-          <span className="task-priority-badge" style={{ background: priorityColor + "22", color: priorityColor, border: `1px solid ${priorityColor}44` }}>{priorityLabel}</span>
-          {repeatLabel && <span className="task-repeat-badge">{repeatLabel}</span>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+          <input
+            type="checkbox"
+            checked={done}
+            onChange={handleToggle}
+            disabled={completing}
+            style={{ width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }}
+          />
+          <h4 className="task-title" style={{ cursor: 'pointer', margin: 0 }} onClick={onOpenDetail}>{task.title}</h4>
         </div>
         <div className="task-actions">
-          {pushplusToken && !done && (
-            <button className={`btn-icon-sm push-card-btn ${pushState || ''}`} onClick={handlePush} title="推送到微信">
-              {pushState === 'sending' ? '⏳' : pushState === 'ok' ? '✓' : pushState === 'err' ? '✕' : '📱'}
-            </button>
-          )}
           <button className="btn-icon-sm" onClick={onEdit} title="编辑">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
@@ -280,19 +271,10 @@ function TaskCard({ task, typeName, color, done, onToggle, onEdit, onDelete, onE
           </button>
         </div>
       </div>
-      <h4 className="task-title" style={{ cursor: 'pointer' }} onClick={onOpenDetail} title="点击查看详情">{task.title}</h4>
-      <div className="task-meta">
-        {task.startDate && <span>开始: {fmtDate(task.startDate)}</span>}
-        {task.endDate && <span>截止: {fmtDate(task.endDate)}</span>}
-        {task.reminderAt && <span className="reminder-tag">提醒: {new Date(task.reminderAt).toLocaleString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>}
-      </div>
-      <div className="task-bottom">
-        <span className={`countdown${cd.urgent ? " urgent" : ""}`}>{cd.text}</span>
-        {!done && (
-          <button className={`toggle-btn${completing ? ' loading' : ''}`} onClick={handleToggle} disabled={completing}>
-            {completing ? '⏳ 处理中...' : '✓ 完成'}
-          </button>
-        )}
+      <div className="task-meta" style={{ paddingLeft: 24 }}>
+        {timeStr && <span>{timeStr}</span>}
+        {task.courseLocation && <span>📍 {task.courseLocation}</span>}
+        {task.notes && <span style={{ color: 'var(--text3)' }}>{task.notes}</span>}
       </div>
     </div>
   );

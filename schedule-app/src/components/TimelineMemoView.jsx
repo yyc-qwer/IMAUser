@@ -19,15 +19,10 @@ export default function TimelineMemoView({
   onQuickAdd,
 }) {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [memoText, setMemoText] = useState(() => localStorage.getItem("ima_memo") || "");
   const [quickAddOpen, setQuickAddOpen] = useState(null);
   const [quickTitle, setQuickTitle] = useState("");
   const [quickTypeId, setQuickTypeId] = useState(null);
   const timelineRef = useRef(null);
-
-  useEffect(() => {
-    localStorage.setItem("ima_memo", memoText);
-  }, [memoText]);
 
   // 滚动到当前小时
   useEffect(() => {
@@ -74,7 +69,7 @@ export default function TimelineMemoView({
 
   return (
     <>
-      <div className="timeline-memo-layout">
+      <div className="timeline-layout">
         <div className="timeline-panel" ref={timelineRef}>
           <div className="date-navigator" style={{ marginBottom: 12 }}>
             <button className="btn-icon" onClick={() => changeDate(-1)}>
@@ -131,19 +126,6 @@ export default function TimelineMemoView({
               );
             })}
           </div>
-        </div>
-
-        <div className="memo-panel">
-          <div className="memo-header">
-            <h3>备忘录</h3>
-            <span className="memo-hint">（自动保存至本地浏览器）</span>
-          </div>
-          <textarea
-            className="memo-textarea"
-            value={memoText}
-            onChange={e => setMemoText(e.target.value)}
-            placeholder="在这里记录想法、笔记...&#10;内容会自动保存到浏览器的本地存储中。"
-          />
         </div>
       </div>
 

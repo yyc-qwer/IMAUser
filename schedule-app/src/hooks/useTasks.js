@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './useAuth';
 import { sortByUrgency, beijingISO } from '../utils/dateUtils';
+import { DEFAULT_TASK_TYPES } from '../utils/defaultTypes';
 
 // ===== Snake/Camel case helpers =====
 function toSnakeCase(obj) {
@@ -129,7 +130,17 @@ export function useTasks() {
     if (typeError) console.error('fetch types error:', typeError);
     // 不在 refresh 中过滤删除 — 删除由 deleteTask 立即从 tasks 中移除
     setTasks(sortByUrgency(mapToCamelCase(taskData || [])));
-    setTaskTypes(mapToCamelCase(typeData || []));
+    const types = mapToCamelCase(typeData || []);
+    setTaskTypes(types);
+    // 初始化默认类型
+    if (types.length === 0) {
+      for (const t of DEFAULT_TASK_TYPES) {
+        await supabase.from('task_types').insert({ user_id: user.id, name: t.name, color: t.color });
+      }
+      // 重新获取
+      const { data: newTypes } = await supabase.from('task_types').select('*').eq('user_id', user.id).order('created_at', { ascending: true });
+      if (newTypes) setTaskTypes(mapToCamelCase(newTypes));
+    }
     setLoading(false);
   }, [user]);
 
@@ -151,7 +162,8 @@ export function useTasks() {
     if (error) { console.error('add task error:', error); return null; }
     const inserted = toCamelCase(data);
     if (isNotificationEnabled()) scheduleTaskNotification(inserted);
-    await refresh(); return inserted.id;
+    setTasks(prev => sortByUrgency([inserted, ...prev]));
+    return inserted.id;
   };
 
   const updateTask = async (id, updates) => {
@@ -159,10 +171,10 @@ export function useTasks() {
     const normalized = { ...updates };
     if (normalized.startDate) normalized.startDate = normalizeDate(normalized.startDate);
     if (normalized.endDate) normalized.endDate = normalizeDate(normalized.endDate);
+    setTasks(prev => sortByUrgency(prev.map(t => t.id === id ? { ...t, ...normalized } : t)));
     const { data, error } = await supabase.from('tasks').update(toSnakeCase(normalized)).eq('id', id).select().single();
     if (error) { console.error('update task error:', error); return; }
     if (isNotificationEnabled()) scheduleTaskNotification(toCamelCase(data));
-    await refresh();
   };
 
   const deleteTask = async (id) => {
@@ -173,19 +185,18 @@ export function useTasks() {
   };
 
   const restoreTask = async (id) => {
-    const target = trash.find(t => t.id === id);
+    const target = trashTasks.find(t => t.id === id);
     if (target) {
       const { userId, ...rest } = target;
+      setTasks(prev => sortByUrgency([toCamelCase({ ...rest, userId }), ...prev]));
       await supabase.from('tasks').insert(toSnakeCase({ ...rest, userId }));
-      await refresh();
     }
     removeFromTrash(id);
   };
 
   const permanentDelete = async (id) => {
-    await supabase.from('subtasks').delete().eq('task_id', id);
-    await supabase.from('tasks').delete().eq('id', id);
     removeFromTrash(id);
+    await supabase.from('tasks').delete().eq('id', id);
   };
 
   const toggleComplete = async (id) => {
@@ -207,7 +218,10 @@ export function useTasks() {
     await refresh();
   };
 
-  const deleteTaskType = async (id) => { await supabase.from('task_types').delete().eq('id', id); await refresh(); };
+  const deleteTaskType = async (id) => {
+    setTaskTypes(prev => prev.filter(t => t.id !== id));
+    await supabase.from('task_types').delete().eq('id', id);
+  };
 
   const getSubtasks = async (taskId) => {
     const { data, error } = await supabase.from('subtasks').select('*').eq('task_id', taskId).order('id', { ascending: true });
@@ -230,8 +244,9 @@ export function useTasks() {
     return stats;
   }, [tasks]);
 
-  const activeTasks = tasks.filter(t => !t.completed);
-  const completedTasks = tasks.filter(t => t.completed);
+  const projectTypeId = taskTypes.find(t => t.name === '项目')?.id;
+  const activeTasks = tasks.filter(t => !t.completed && t.typeId !== projectTypeId);
+  const completedTasks = tasks.filter(t => t.completed && t.typeId !== projectTypeId);
 
   return { tasks, taskTypes, loading, activeTasks, completedTasks, trashTasks, addTask, updateTask, deleteTask, restoreTask, permanentDelete, toggleComplete, addTaskType, deleteTaskType, refresh, getSubtasks, addSubtask, toggleSubtask, deleteSubtask, getWeeklyStats };
 }
